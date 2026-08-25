@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     DATABASE_URL: Optional[str] = None
     
     # API Keys
-    MISTRALAI_API_KEY: Optional[str] = None
+    MISTRAL_API_KEY: Optional[str] = None
     MISTRAL_MODEL: str = "mistral-large-latest"
     MISTRAL_EMBEDDING_MODEL: str = "mistral-embed"
     

@@ -49,3 +49,40 @@ class ConfigResponse(BaseModel):
     upload_dir: str = Field(..., description="Upload directory path")
     output_dir: str = Field(..., description="Output directory path")
     features: dict[str, bool] = Field(default_factory=dict, description="Enabled features")
+
+
+class DocumentResponse(BaseModel):
+    """Document information response."""
+    
+    id: str = Field(..., description="Unique document identifier")
+    name: str = Field(..., description="Name of the document")
+    storage_link: str = Field(..., description="Path to the stored PDF file")
+    date_created: str = Field(..., description="Timestamp when document was created")
+
+
+class DocumentUploadResponse(BaseModel):
+    """Response for document upload endpoint."""
+    
+    status: str = Field(..., description="Upload status")
+    document_id: str = Field(..., description="Unique document identifier")
+    document_name: str = Field(..., description="Name of the uploaded document")
+    storage_path: str = Field(..., description="Path where file was stored")
+    message: Optional[str] = Field(None, description="Additional message")
+
+
+class PDFElementResponse(BaseModel):
+    """Response for a single PDF element."""
+    
+    type: str = Field(..., description="Type of element (Title, NarrativeText, Table, etc.)")
+    text: str = Field(..., description="Text content of the element")
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Element metadata")
+
+
+class PDFProcessingResponse(BaseModel):
+    """Response for PDF processing endpoint."""
+    
+    status: str = Field(..., description="Processing status")
+    document_id: str = Field(..., description="Unique document identifier")
+    elements_count: int = Field(..., description="Number of elements extracted")
+    elements: list[PDFElementResponse] = Field(default_factory=list, description="List of extracted elements")
+    message: Optional[str] = Field(None, description="Additional message")

@@ -1,14 +1,13 @@
 """
 Database configuration and session management using SQLAlchemy.
+Synchronous version - no async support.
 Supports PostgreSQL, SQLite, and other databases via connection string.
 """
 
-from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
+from typing import Generator
 
-from sqlalchemy import event
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from sqlalchemy import create_engine, event
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from backend.config import settings
 
@@ -23,102 +22,99 @@ def get_database_url() -> str:
     return settings.database_url
 
 
-# Create async engine
-# For SQLite, we need to handle some specific settings
+# Get and normalize database URL
 database_url = get_database_url()
-if database_url.startswith("sqlite"):
-    # SQLite doesn't support async well in some cases, but we'll try
-    engine = create_async_engine(
-        database_url.replace("sqlite:///", "sqlite+aiosqlite:///"),
-        echo=settings.DEBUG,
-        future=True,
-    )
-else:
-    engine = create_async_engine(
-        database_url,
-        echo=settings.DEBUG,
-        pool_pre_ping=True,
-        pool_size=5,
-        max_overflow=10,
-    )
+
+# For PostgreSQL, ensure sync driver
+if database_url.startswith("postgresql://"):
+    database_url = database_url.replace("postgresql://", "postgresql+psycopg2://")
+elif database_url.startswith("sqlite"):
+    # Keep SQLite as-is for sync
+    pass
+
+# Create sync engine
+engine = create_engine(
+    database_url,
+    echo=settings.DEBUG,
+    pool_pre_ping=True,
+    pool_size=5,
+    max_overflow=10,
+)
 
 # Enable foreign keys for SQLite
 if database_url.startswith("sqlite"):
-    @event.listens_for(engine.sync_engine, "connect")
+    @event.listens_for(engine, "connect")
     def set_sqlite_pragma(dbapi_connection, connection_record):
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.close()
 
 # Session factory
-AsyncSessionLocal = async_sessionmaker(
+SessionLocal = sessionmaker(
     bind=engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
     autocommit=False,
+    autoflush=False,
 )
 
-# Sync session factory (for migrations)
-SyncEngine = create_async_engine(database_url).sync_engine
+# Sync engine for migrations
+SyncEngine = engine
 SyncSessionLocal = sessionmaker(bind=SyncEngine, autocommit=False, autoflush=False)
 
 
-async def get_db() -> AsyncGenerator[AsyncSession, None]:
+def get_db() -> Generator[Session, None, None]:
     """
-    Dependency that provides a database session.
+    Dependency that provides a synchronous database session.
     Use with FastAPI's Depends().
     """
-    async with AsyncSessionLocal() as session:
-        try:
-            yield session
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise
-        finally:
-            await session.close()
+    session = SessionLocal()
+    try:
+        yield session
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
 
 
-@asynccontextmanager
-async def get_db_context() -> AsyncGenerator[AsyncSession, None]:
+
+def get_db_context() -> Generator[Session, None, None]:
     """
-    Context manager for database sessions.
+    Context manager for synchronous database sessions.
     Usage:
-        async with get_db_context() as db:
+        with get_db_context() as db:
             # use db
     """
-    async with AsyncSessionLocal() as session:
-        try:
-            yield session
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise
-        finally:
-            await session.close()
+    session = SessionLocal()
+    try:
+        yield session
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
 
 
-async def init_db() -> None:
+def init_db() -> None:
     """
     Initialize database tables.
     Create all tables defined in models.
     """
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-        print("Database tables created successfully.")
+    Base.metadata.create_all(bind=engine)
+    print("Database tables created successfully.")
 
 
-async def drop_db() -> None:
+def drop_db() -> None:
     """
     Drop all database tables.
     WARNING: This will delete all data!
     """
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        print("Database tables dropped successfully.")
+    Base.metadata.drop_all(bind=engine)
+    print("Database tables dropped successfully.")
 
 
-async def close_db() -> None:
+def close_db() -> None:
     """Close all database connections."""
-    await engine.dispose()
+    engine.dispose()
     print("Database connections closed.")

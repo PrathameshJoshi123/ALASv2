@@ -9,6 +9,7 @@ This module creates and configures the FastAPI application with:
 - Error handling
 """
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -38,6 +39,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
     Application lifespan manager.
     Handles startup and shutdown events.
+    Uses asyncio.to_thread for sync database operations.
     """
     # Startup
     logger.info("Starting application...")
@@ -46,9 +48,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     settings.ensure_directories()
     logger.info(f"Storage directories created")
     
-    # Initialize database
+    # Initialize database (sync function run in thread)
     try:
-        await init_db()
+        await asyncio.to_thread(init_db)
         logger.info("Database initialized")
     except Exception as e:
         logger.error(f"Database initialization failed: {e}")
@@ -63,7 +65,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Shutdown
     logger.info("Shutting down application...")
     try:
-        await close_db()
+        await asyncio.to_thread(close_db)
         logger.info("Database connections closed")
     except Exception as e:
         logger.error(f"Database shutdown failed: {e}")
@@ -166,14 +168,17 @@ async def db_health() -> dict:
     """Check database connectivity."""
     try:
         from sqlalchemy import text
-        from backend.database import AsyncSessionLocal
+        from backend.database import SessionLocal
         
-        async with AsyncSessionLocal() as session:
-            await session.execute(text("SELECT 1"))
-            return {
-                "status": "healthy",
-                "database_url": settings.database_url,
-            }
+        def check_db():
+            with SessionLocal() as session:
+                session.execute(text("SELECT 1"))
+        
+        await asyncio.to_thread(check_db)
+        return {
+            "status": "healthy",
+            "database_url": settings.database_url,
+        }
     except Exception as e:
         logger.warning(f"Database health check failed: {e}")
         return {
@@ -203,10 +208,10 @@ async def api_info() -> dict:
 
 
 # Include API routers
-from backend.routes import api as api_router
-from backend.routes import tasks as tasks_router
+from backend.routes import api_router, contracts_router, tasks_router
 
 app.include_router(api_router, prefix="/api/v1", tags=["api"])
+app.include_router(contracts_router, prefix="/api/v1", tags=["contracts"])
 app.include_router(tasks_router, prefix="/tasks", tags=["tasks"])
 
 

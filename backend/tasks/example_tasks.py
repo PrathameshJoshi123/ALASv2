@@ -6,7 +6,7 @@ Replace with your actual background task implementations.
 import time
 from pathlib import Path
 
-from celery import shared_task
+from backend.celery_app import celery_app
 from celery.utils.log import get_task_logger
 
 from backend.config import settings
@@ -14,7 +14,7 @@ from backend.config import settings
 logger = get_task_logger(__name__)
 
 
-@shared_task(bind=True, name="example_add_task")
+@celery_app.task(bind=True, name="example_add_task")
 def add_task(self, a: int, b: int) -> int:
     """
     Example task: Add two numbers.
@@ -26,7 +26,7 @@ def add_task(self, a: int, b: int) -> int:
     return result
 
 
-@shared_task(bind=True, name="example_process_file_task")
+@celery_app.task(bind=True, name="example_process_file_task")
 def process_file_task(self, file_path: str, output_dir: str) -> dict:
     """
     Example task: Process a file in the background.
@@ -59,7 +59,7 @@ def process_file_task(self, file_path: str, output_dir: str) -> dict:
     }
 
 
-@shared_task(bind=True, name="example_long_running_task")
+@celery_app.task(bind=True, name="example_long_running_task")
 def long_running_task(self, duration: int = 10) -> str:
     """
     Example task: Simulate a long-running operation.
@@ -77,7 +77,7 @@ def long_running_task(self, duration: int = 10) -> str:
     return f"Slept for {duration} seconds"
 
 
-@shared_task(bind=True, name="example_send_notification_task")
+@celery_app.task(bind=True, name="example_send_notification_task")
 def send_notification_task(self, message: str, recipient: str) -> dict:
     """
     Example task: Simulate sending a notification.

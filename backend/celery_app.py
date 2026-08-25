@@ -3,9 +3,6 @@ Celery application configuration.
 Handles background task processing with Redis as the message broker.
 """
 
-import os
-from pathlib import Path
-
 from celery import Celery
 from celery.schedules import crontab
 
@@ -19,9 +16,7 @@ def create_celery_app() -> Celery:
     Returns:
         Configured Celery instance.
     """
-    # Set default Django settings module (required for Celery)
-    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "backend.config")
-    
+        
     # Create Celery app
     app = Celery(
         main="backend",
@@ -70,11 +65,6 @@ def create_celery_app() -> Celery:
         
         # Queue settings
         task_default_queue="default",
-        task_queues=(
-            {"name": "default", "priority": 5},
-            {"name": "high_priority", "priority": 10},
-            {"name": "low_priority", "priority": 1},
-        ),
         
         # Logging
         worker_log_format="[%(asctime)s: %(levelname)s/%(processName)s] %(message)s",
@@ -102,33 +92,6 @@ def configure_logging(*args, **kwargs):
         format="[%(asctime)s: %(levelname)s/%(processName)s] %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
-
-
-# For auto-discovery of tasks in development
-def autodiscover_tasks():
-    """
-    Auto-discover tasks from all modules.
-    This is useful for development when you don't want to manually
-    add every new task module to the imports list.
-    """
-    import importlib
-    from pathlib import Path
-    
-    tasks_dir = Path(__file__).parent / "tasks"
-    if tasks_dir.exists():
-        for py_file in tasks_dir.glob("*.py"):
-            if py_file.name != "__init__.py":
-                module_name = f"backend.tasks.{py_file.stem}"
-                try:
-                    importlib.import_module(module_name)
-                    celery_app.autodiscover_tasks([module_name])
-                except ImportError:
-                    pass
-
-
-# Initialize the app (this gets run when the module is imported)
-if settings.DEBUG:
-    autodiscover_tasks()
 
 
 __all__ = ["celery_app", "create_celery_app"]
