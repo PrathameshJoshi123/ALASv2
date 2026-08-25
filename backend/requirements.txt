@@ -1,0 +1,21 @@
+fastapi
+uvicorn[standard]
+celery[redis]
+redis
+python-multipart
+unstructured
+pdfminer.six
+langchain-text-splitters
+langchain-core
+langchain
+langchain-mistralai
+langchain-chroma
+chromadb
+deepagents
+# Enables the filesystem-backed skills and memory workflow used by the contract agent.
+langgraph-checkpoint
+ddgs
+requests
+pydantic-settings
+python-dotenv
+psycopg2-binary

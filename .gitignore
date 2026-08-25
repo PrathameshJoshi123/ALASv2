@@ -1,0 +1,7 @@
+venv
+.env
+tests/
+
+start_command.txt
+__pycache__/
+logs.txt
