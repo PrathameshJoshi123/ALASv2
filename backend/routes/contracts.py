@@ -26,7 +26,7 @@ from backend.schemas.response_schemas import (
     PDFProcessingResponse,
 )
 from backend.schemas.task_schemas import TaskStatusResponse, TaskSubmitResponse
-from backend.tasks import process_pdf_task
+from backend.tasks import process_pdf_task, process_and_chunk_task
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +124,7 @@ def upload_contract(
     "/{document_id}/process",
     response_model=TaskSubmitResponse,
     summary="Process a PDF contract (async)",
-    description="Submit a PDF contract for background processing. Extracts structured elements using Unstructured.",
+    description="Submit a PDF contract for background processing. Extracts structured elements using Unstructured AND automatically chunks them for embeddings/retrieval.",
 )
 def process_contract(
     document_id: str,
@@ -134,13 +134,12 @@ def process_contract(
     Submit a PDF contract for background processing.
     
     This endpoint queues the PDF for processing using Celery workers.
-    The processing extracts:
-    - Titles
-    - Paragraphs (NarrativeText)
-    - Tables
-    - Other document elements
+    The processing:
+    1. Extracts structured elements (Titles, Paragraphs, Tables, etc.)
+    2. Automatically chunks them into logical units for embeddings/retrieval
+    3. Saves chunks to database with full traceability
     
-    The extraction preserves the document hierarchy for precise legal analysis.
+    The extraction and chunking preserve the document hierarchy for precise legal analysis.
     
     Args:
         document_id: Unique identifier of the document to process
@@ -169,22 +168,22 @@ def process_contract(
             detail=f"PDF file not found at {storage_path}",
         )
     
-    # Submit task to Celery
+    # Submit task to Celery - use the chained task that auto-triggers chunking
     try:
         logger.info(f"Submitting processing task for document: {document_id}")
         
-        task = process_pdf_task.delay(
+        task = process_and_chunk_task.delay(
             document_id=document.id,
             file_path=str(storage_path),
             filename=document.name,
         )
         
-        logger.info(f"Task {task.id} submitted for document {document_id}")
+        logger.info(f"Task {task.id} submitted for document {document_id} (includes auto-chunking)")
         
         return TaskSubmitResponse(
             task_id=task.id,
             status="queued",
-            message=f"PDF processing task queued for document {document_id}",
+            message=f"PDF processing + chunking task queued for document {document_id}",
         )
         
     except Exception as e:

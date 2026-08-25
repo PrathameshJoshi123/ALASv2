@@ -214,6 +214,15 @@ app.include_router(api_router, prefix="/api/v1", tags=["api"])
 app.include_router(contracts_router, prefix="/api/v1", tags=["contracts"])
 app.include_router(tasks_router, prefix="/tasks", tags=["tasks"])
 
+# Include chunking router if available
+try:
+    from backend.routes import chunking_router
+    if chunking_router:
+        app.include_router(chunking_router, prefix="/api/v1", tags=["chunking"])
+        logger.info("Chunking routes mounted")
+except ImportError:
+    pass
+
 
 # Root endpoint
 @app.get("/", tags=["root"])

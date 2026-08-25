@@ -4,11 +4,15 @@ Document model for storing PDF contracts and their metadata.
 
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import String, DateTime, Text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.database import Base
+
+if TYPE_CHECKING:
+    from backend.services.chunking.database import Chunk
 
 
 class Document(Base):
@@ -20,6 +24,7 @@ class Document(Base):
         name: Original name of the document
         storage_link: Path to the stored PDF file
         date_created: Timestamp when the document was uploaded
+        chunks: Relationship to Chunk models (processed chunks from this document)
     """
     
     __tablename__ = "documents"
@@ -45,6 +50,13 @@ class Document(Base):
         DateTime(timezone=True),
         default=datetime.utcnow,
         nullable=False,
+    )
+    
+    # Relationship to chunks (using forward reference to avoid circular import)
+    chunks: Mapped[list["Chunk"]] = relationship(
+        "Chunk",
+        back_populates="document",
+        cascade="all, delete-orphan",
     )
     
     def __repr__(self) -> str:

@@ -8,6 +8,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from celery import chain
+
 from backend.celery_app import celery_app
 from celery.utils.log import get_task_logger
 
@@ -142,4 +144,70 @@ def process_pdf_task(
         }
 
 
-__all__ = ["process_pdf_task"]
+@celery_app.task(bind=True, name="process_and_chunk_task")
+def process_and_chunk_task(
+    self,
+    document_id: str,
+    file_path: str,
+    filename: str,
+) -> dict[str, Any]:
+    """
+    Background task to process PDF AND automatically chunk it using Celery chain.
+    
+    This task chains PDF processing with automatic chunking:
+    1. process_pdf_task extracts elements
+    2. chunk_document_task processes elements into chunks
+    
+    Args:
+        document_id: Unique identifier for the document
+        file_path: Path to the PDF file
+        filename: Original filename of the document
+        
+    Returns:
+        Dictionary with combined results from both tasks
+    """
+    try:
+        from backend.tasks.chunking_tasks import chunk_document_task
+        
+        logger.info(f"Starting chained PDF processing + chunking for document: {document_id}")
+        
+        # Create the chain: PDF processing -> Chunking
+        # The result of process_pdf_task is passed to chunk_document_task
+        # But chunk_document_task expects (document_id, elements, filename)
+        # So we need to use a helper function or modify the chain
+        
+        # For now, we'll call them sequentially to maintain simplicity
+        # Celery chains with complex argument passing require signature manipulation
+        
+        # Step 1: Process PDF
+        pdf_result = process_pdf_task(document_id, file_path, filename)
+        
+        if pdf_result.get("status") != "success":
+            return {
+                **pdf_result,
+                "chunking": {"status": "skipped", "reason": "PDF processing failed"},
+            }
+        
+        # Step 2: Chunk the elements
+        elements = pdf_result.get("elements", [])
+        chunk_result = chunk_document_task(document_id, elements, filename)
+        
+        # Combine results
+        return {
+            "status": "success",
+            "document_id": document_id,
+            "pdf_result": pdf_result,
+            "chunk_result": chunk_result,
+        }
+        
+    except Exception as e:
+        error_msg = f"Failed in chained processing: {e}"
+        logger.error(f"Error in chained task for document {document_id}: {e}", exc_info=True)
+        return {
+            "status": "error",
+            "document_id": document_id,
+            "error": error_msg,
+        }
+
+
+__all__ = ["process_pdf_task", "process_and_chunk_task"]

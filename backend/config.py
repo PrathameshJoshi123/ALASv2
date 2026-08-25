@@ -64,6 +64,11 @@ class Settings(BaseSettings):
     NEO4J_USERNAME: Optional[str] = None
     NEO4J_PASSWORD: Optional[str] = None
     
+    # Chunking Configuration
+    CHUNK_SIZE: int = 800
+    CHUNK_OVERLAP: int = 100
+    MAX_UNIT_SIZE: int = 2000
+    
     @field_validator("UPLOAD_DIR", "OUTPUT_DIR", "CHROMA_DIR")
     @classmethod
     def validate_paths(cls, v: Path) -> Path:
