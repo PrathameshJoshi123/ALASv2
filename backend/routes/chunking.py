@@ -363,6 +363,14 @@ def delete_document_chunks(
         
         deleted_count = delete_chunks_by_document(document_id, db)
         
+        # Delete chunks from Chroma DB
+        try:
+            from backend.services.vector_storage import delete_chunks_from_vector_db
+            delete_chunks_from_vector_db(document_id)
+        except Exception as e:
+            logger.error(f"Failed to delete chunks from Chroma DB for document {document_id}: {e}")
+            raise e
+        
         return {
             "status": "success",
             "document_id": document_id,
@@ -476,4 +484,101 @@ def get_document_mentions(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve mentions: {e}",
+        )
+
+
+from pydantic import BaseModel
+
+class QAQueryRequest(BaseModel):
+    query: str
+
+
+@router.post(
+    "/{document_id}/embed",
+    response_model=TaskSubmitResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Manually generate vector embeddings for a document's chunks",
+    description="Retrieve all chunks for the document sequentially from the relational database, embed them using nomic-embed-text, and store them in Chroma DB.",
+)
+def embed_document_chunks(
+    document_id: str,
+    db: Session = Depends(get_db),
+) -> TaskSubmitResponse:
+    """
+    Manually retrieve database chunks for a document sequentially and save their embeddings in Chroma DB.
+    """
+    # Verify document exists
+    result = db.execute(
+        select(Document).where(Document.id == document_id)
+    )
+    document = result.scalar_one_or_none()
+    
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document with ID {document_id} not found",
+        )
+        
+    try:
+        from backend.tasks.chunking_tasks import embed_document_chunks_task
+        
+        # Submit Celery task
+        task = embed_document_chunks_task.delay(document_id=document_id)
+        
+        return TaskSubmitResponse(
+            task_id=task.id,
+            status="queued",
+            message=f"Manual embedding generation task queued for document {document_id}",
+        )
+    except Exception as e:
+        logger.error(f"Failed to manually embed chunks for document {document_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to manually embed chunks: {str(e)}",
+        )
+
+
+@router.post(
+    "/{document_id}/qa",
+    response_model=TaskSubmitResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Ask the retrieval agent a question about the document",
+    description="Invokes the retrieval agent using vector search, BM25, and database context retrieval to answer the question.",
+)
+def question_answer_document(
+    document_id: str,
+    request: QAQueryRequest,
+    db: Session = Depends(get_db),
+) -> TaskSubmitResponse:
+    """
+    Ask a question about a document. The retrieval agent will plan, reason, retrieve, and answer.
+    """
+    # Verify document exists
+    result = db.execute(
+        select(Document).where(Document.id == document_id)
+    )
+    document = result.scalar_one_or_none()
+    
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document with ID {document_id} not found",
+        )
+        
+    try:
+        from backend.tasks.chunking_tasks import qa_retrieval_agent_task
+        
+        # Submit Celery task
+        task = qa_retrieval_agent_task.delay(document_id=document_id, query=request.query)
+        
+        return TaskSubmitResponse(
+            task_id=task.id,
+            status="queued",
+            message=f"QA retrieval agent task queued for document {document_id}",
+        )
+    except Exception as e:
+        logger.error(f"QA agent invocation failed for document {document_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"QA agent failed: {str(e)}",
         )
