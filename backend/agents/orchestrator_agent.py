@@ -314,6 +314,9 @@ If you need to query contract chunks from the database:
         {**REVIEW_AGENT, "model": get_orchestrator_model(), "inherit_tools": True, "system_prompt": REVIEW_AGENT.get("system_prompt", "") + DB_GUIDELINES},
     ]
 
+    from langgraph.store.memory import InMemoryStore
+    store = InMemoryStore()
+
     return create_deep_agent(
         model=get_orchestrator_model(),
 
@@ -322,6 +325,7 @@ If you need to query contract chunks from the database:
         subagents=specialist_agents,
 
         backend=backend,
+        store=store,
 
         skills=[
             "backend/skills/contract-orchestration",

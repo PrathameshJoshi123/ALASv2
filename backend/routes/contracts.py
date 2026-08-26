@@ -9,6 +9,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated
+from pydantic import BaseModel, Field
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import JSONResponse
@@ -242,6 +243,116 @@ def analyze_contract_agent(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to queue agent analysis: {e}",
+        )
+
+
+class DraftContractRequest(BaseModel):
+    """Request schema for contract drafting."""
+    drafting_instructions: str = Field(..., description="Drafting requirements, values, and guidelines")
+
+
+@router.post(
+    "/{document_id}/draft",
+    response_model=TaskSubmitResponse,
+    summary="Trigger contract drafting agent",
+    description="Trigger the multi-agent contract drafting orchestrator based on the template document ID and drafting instructions.",
+)
+def draft_contract_endpoint(
+    document_id: str,
+    request: DraftContractRequest,
+    db: Session = Depends(get_db),
+) -> TaskSubmitResponse:
+    """
+    Trigger the multi-agent contract drafting orchestrator.
+    """
+    # Verify document exists
+    result = db.execute(
+        select(Document).where(Document.id == document_id)
+    )
+    document = result.scalar_one_or_none()
+    
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document template with ID {document_id} not found",
+        )
+        
+    try:
+        logger.info(f"Submitting drafting task for document template: {document_id}")
+        
+        # Import task locally to avoid circular dependencies
+        from backend.tasks import run_agent_drafting_task
+        
+        task = run_agent_drafting_task.delay(
+            document_id=document.id,
+            drafting_instructions=request.drafting_instructions,
+        )
+        
+        logger.info(f"Drafting task {task.id} submitted for document {document_id}")
+        
+        return TaskSubmitResponse(
+            task_id=task.id,
+            status="queued",
+            message=f"Contract drafting task queued for document {document_id}",
+        )
+    except Exception as e:
+        logger.error(f"Failed to submit contract drafting task for document {document_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to queue contract drafting: {e}",
+        )
+
+
+@router.post(
+    "/{document_id}/draft/agent",
+    response_model=TaskSubmitResponse,
+    summary="Trigger contract drafting agent only",
+    description="Trigger the contract drafting agent on an already processed and chunked contract template document.",
+)
+def draft_contract_agent_only_endpoint(
+    document_id: str,
+    request: DraftContractRequest,
+    db: Session = Depends(get_db),
+) -> TaskSubmitResponse:
+    """
+    Trigger the contract drafting agent only.
+    """
+    # Verify document exists
+    result = db.execute(
+        select(Document).where(Document.id == document_id)
+    )
+    document = result.scalar_one_or_none()
+    
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document template with ID {document_id} not found",
+        )
+        
+    try:
+        logger.info(f"Submitting agent-only drafting task for document template: {document_id}")
+        
+        # Import task locally to avoid circular dependencies
+        from backend.tasks import run_agent_drafting_task
+        
+        task = run_agent_drafting_task.delay(
+            document_id=document.id,
+            drafting_instructions=request.drafting_instructions,
+            auto_chunk=False,
+        )
+        
+        logger.info(f"Agent-only drafting task {task.id} submitted for document {document_id}")
+        
+        return TaskSubmitResponse(
+            task_id=task.id,
+            status="queued",
+            message=f"Agent-only contract drafting task queued for document {document_id}",
+        )
+    except Exception as e:
+        logger.error(f"Failed to submit contract drafting agent task for document {document_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to queue agent-only contract drafting: {e}",
         )
 
 

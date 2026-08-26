@@ -281,10 +281,14 @@ def create_retrieval_agent() -> Any:
         },
     )
     
+    from langgraph.store.memory import InMemoryStore
+    store = InMemoryStore()
+    
     return create_deep_agent(
         model=get_ministral_model(),
         system_prompt=RETRIEVAL_AGENT_PROMPT,
         backend=backend,
+        store=store,
         skills=["backend/skills/document-retrieval"],
         tools=[
             search_chunks_vector_db,
