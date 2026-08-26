@@ -300,6 +300,12 @@ def process_and_chunk_task(
                 with open(report_file, "w", encoding="utf-8") as f:
                     json.dump(report_data, f, indent=2, ensure_ascii=False)
                 logger.info(f"Saved agent analysis report to: {report_file}")
+                
+                # Save to database
+                from backend.services.contract_analysis_service import save_contract_analysis_to_db
+                db_result = save_contract_analysis_to_db(document_id, report_data, overwrite=True)
+                logger.info(f"DB Save result for document {document_id}: {db_result}")
+                
                 return {
                     "status": "success",
                     "document_id": document_id,
@@ -307,7 +313,7 @@ def process_and_chunk_task(
                     "analysis": report_data
                 }
             except Exception as report_err:
-                logger.error(f"Failed to save agent analysis report to file: {report_err}", exc_info=True)
+                logger.error(f"Failed to save agent analysis report: {report_err}", exc_info=True)
 
         return {
             "status": "error",
@@ -441,6 +447,12 @@ def run_agent_analysis_task(
                 with open(report_file, "w", encoding="utf-8") as f:
                     json.dump(report_data, f, indent=2, ensure_ascii=False)
                 logger.info(f"Saved agent analysis report to: {report_file}")
+                
+                # Save to database
+                from backend.services.contract_analysis_service import save_contract_analysis_to_db
+                db_result = save_contract_analysis_to_db(document_id, report_data, overwrite=True)
+                logger.info(f"DB Save result for document {document_id}: {db_result}")
+                
                 return {
                     "status": "success",
                     "document_id": document_id,
@@ -448,7 +460,7 @@ def run_agent_analysis_task(
                     "analysis": report_data
                 }
             except Exception as report_err:
-                logger.error(f"Failed to save agent analysis report to file: {report_err}", exc_info=True)
+                logger.error(f"Failed to save agent analysis report: {report_err}", exc_info=True)
         
         return {
             "status": "error",

@@ -5,3 +5,6 @@ tests/
 start_command.txt
 __pycache__/
 logs.txt
+
+storage/
+7750cfec-29fb-45b0-afb8-53ea52432c4d_analysis_report.json
