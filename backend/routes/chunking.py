@@ -377,3 +377,103 @@ def delete_document_chunks(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to delete chunks: {e}",
         )
+
+
+@router.post(
+    "/{document_id}/extract-mentions",
+    response_model=TaskSubmitResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Trigger entity & mention extraction for a document",
+    description="Submit a document's chunks for parallel entity and mention extraction.",
+)
+def extract_document_mentions(
+    document_id: str,
+    db: Session = Depends(get_db),
+) -> TaskSubmitResponse:
+    """
+    Trigger entity & mention extraction.
+    
+    Args:
+        document_id: Unique identifier of the document
+        db: Database session
+        
+    Returns:
+        TaskSubmitResponse with Celery task ID
+    """
+    # Verify document exists
+    result = db.execute(
+        select(Document).where(Document.id == document_id)
+    )
+    document = result.scalar_one_or_none()
+    
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document with ID {document_id} not found",
+        )
+    
+    try:
+        from backend.tasks.entity_mention_tasks import analyze_document_entities_task
+        
+        task = analyze_document_entities_task.delay(document_id=document_id)
+        
+        return TaskSubmitResponse(
+            task_id=task.id,
+            status="queued",
+            message=f"Entity mention extraction task queued for document {document_id}",
+        )
+    except Exception as e:
+        logger.error(f"Failed to submit mention extraction task for document {document_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to queue mention extraction task: {e}",
+        )
+
+
+@router.get(
+    "/{document_id}/mentions",
+    summary="List all extracted entity mentions for a document",
+    description="Retrieve all extracted entity mentions for a document.",
+)
+def get_document_mentions(
+    document_id: str,
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    """
+    Get all extracted entity mentions for a document.
+    
+    Args:
+        document_id: Unique identifier of the document
+        db: Database session
+        
+    Returns:
+        List of entity mention dictionaries
+    """
+    # Verify document exists
+    result = db.execute(
+        select(Document).where(Document.id == document_id)
+    )
+    document = result.scalar_one_or_none()
+    
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document with ID {document_id} not found",
+        )
+    
+    try:
+        from backend.models.entity_mention import EntityMention
+        
+        result = db.execute(
+            select(EntityMention)
+            .where(EntityMention.document_id == document_id)
+            .order_by(EntityMention.chunk_id, EntityMention.start_char)
+        )
+        mentions = result.scalars().all()
+        return [mention.to_dict() for mention in mentions]
+    except Exception as e:
+        logger.error(f"Failed to get mentions for document {document_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve mentions: {e}",
+        )

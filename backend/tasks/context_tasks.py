@@ -30,8 +30,6 @@ def analyze_chunks_context_task(
         
         # Import here to avoid circular imports
         from backend.database import SessionLocal
-        from backend.services.chunking.database import get_chunks_by_document
-        from backend.agents.chunk_context_agent import analyze_chunk
         from backend.models.documents import Document
         from sqlalchemy import select
         
@@ -50,6 +48,7 @@ def analyze_chunks_context_task(
             
             document_metadata = {"filename": document.name}
             
+            from backend.services.chunking.database import get_chunks_by_document
             # Fetch all chunks for this document
             chunks = get_chunks_by_document(document_id, db)
             if not chunks:
@@ -63,79 +62,23 @@ def analyze_chunks_context_task(
             
             logger.info(f"Found {len(chunks)} chunks to analyze for document {document_id}")
             
-            # Merge small chunks (< 200 words) with neighbors to reduce API calls
-            from backend.agents.chunk_context_agent import MIN_CHUNK_WORDS, MAX_MERGED_WORDS, merge_small_chunks
-            merged_chunks = merge_small_chunks(chunks)
+            # Fetch sequentially using the db helper
+            from backend.agents.orchestrator_agent import get_optimized_chunks_from_db
+            merged_chunks = get_optimized_chunks_from_db(document_id)
             
             logger.info(f"Merged {len(chunks)} chunks into {len(merged_chunks)} groups for analysis")
-            logger.info(f"Chunk merging: MIN_WORDS={MIN_CHUNK_WORDS}, MAX_MERGED_WORDS={MAX_MERGED_WORDS}")
             
-            analyzed_count = 0
-            # Build a mapping of chunk_id to index for faster lookup
-            chunk_id_to_index = {chunk.chunk_id: idx for idx, chunk in enumerate(chunks)}
-            chunk_id_to_chunk = {chunk.chunk_id: chunk for chunk in chunks}
+            # We no longer run chunk_context_agent since it was discarded.
+            # Downstream context tasks should interact with the new orchestrator or specialists.
+            results = merged_chunks
             
-            # Iterate and analyze each merged chunk group
-            for chunk_group in merged_chunks:
-                current_chunk_ids = chunk_group["chunk_ids"]
-                current_chunk_text = chunk_group["merged_text"]
-                original_texts = chunk_group.get("original_texts", {})
-                
-                # Skip if no chunk IDs in this group
-                if not current_chunk_ids:
-                    logger.warning(f"Skipping chunk group with no chunk_ids")
-                    continue
-                
-                # Get previous/next text from non-merged chunks for context
-                # Find the position of the first and last chunk in this group
-                first_chunk_id = current_chunk_ids[0]
-                last_chunk_id = current_chunk_ids[-1]
-                
-                first_chunk_idx = chunk_id_to_index.get(first_chunk_id, 0)
-                last_chunk_idx = chunk_id_to_index.get(last_chunk_id, len(chunks) - 1)
-                
-                # Get previous chunk (from original list, not in this group)
-                prev_idx = first_chunk_idx - 1
-                previous_text = None
-                if prev_idx >= 0:
-                    prev_chunk = chunk_id_to_chunk.get(chunks[prev_idx].chunk_id)
-                    if prev_chunk and prev_chunk.chunk_id not in current_chunk_ids:
-                        previous_text = prev_chunk.content
-                
-                # Get next chunk (from original list, not in this group)
-                next_idx = last_chunk_idx + 1
-                next_text = None
-                if next_idx < len(chunks):
-                    next_chunk = chunk_id_to_chunk.get(chunks[next_idx].chunk_id)
-                    if next_chunk and next_chunk.chunk_id not in current_chunk_ids:
-                        next_text = next_chunk.content
-                
-                try:
-                    # Run the agent on the merged chunk group
-                    # Pass the first chunk_id as the representative
-                    analyze_chunk(
-                        current_chunk_id=current_chunk_ids[0],
-                        current_chunk_text=current_chunk_text,
-                        document_id=document_id,
-                        previous_chunk_text=previous_text,
-                        next_chunk_text=next_text,
-                        document_metadata=document_metadata,
-                        db_session=db,
-                        merged_chunk_ids=current_chunk_ids,
-                        is_merged=len(current_chunk_ids) > 1
-                    )
-                    analyzed_count += 1
-                except Exception as e:
-                    logger.error(f"Failed to analyze chunk group {current_chunk_ids}: {e}", exc_info=True)
-                    # Continue analyzing other chunks even if one fails
-            
-            logger.info(f"Successfully analyzed {analyzed_count}/{len(chunks)} chunks for document {document_id}")
+            logger.info(f"Successfully processed {len(results)} groups for document {document_id}")
             
             return {
                 "status": "success",
                 "document_id": document_id,
                 "chunks_count": len(chunks),
-                "analyzed_count": analyzed_count,
+                "analyzed_count": len(results),
             }
             
     except Exception as e:

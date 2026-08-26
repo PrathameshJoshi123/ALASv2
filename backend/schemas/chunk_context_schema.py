@@ -244,3 +244,8 @@ class ChunkContextResponse(BaseModel):
         ...,
         description="The model's confidence rating of its classification, between 0.0 and 1.0."
     )
+
+
+class ChunkContextListResponse(BaseModel):
+    """List response schema for chunk contexts."""
+    results: List[ChunkContextResponse] = Field(default_factory=list)

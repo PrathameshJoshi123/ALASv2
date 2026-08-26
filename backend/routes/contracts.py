@@ -194,6 +194,57 @@ def process_contract(
         )
 
 
+@router.post(
+    "/{document_id}/analyze",
+    response_model=TaskSubmitResponse,
+    summary="Trigger orchestrator agent analysis only",
+    description="Trigger the orchestrator agent contract analysis on an already processed and chunked contract document.",
+)
+def analyze_contract_agent(
+    document_id: str,
+    db: Session = Depends(get_db),
+) -> TaskSubmitResponse:
+    """
+    Trigger the orchestrator agent contract analysis only.
+    
+    This expects the document is already uploaded and chunked. It triggers
+    the deep agent analysis background task.
+    """
+    # Get document from database
+    result = db.execute(
+        select(Document).where(Document.id == document_id)
+    )
+    document = result.scalar_one_or_none()
+    
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document with ID {document_id} not found",
+        )
+        
+    try:
+        logger.info(f"Submitting agent-only analysis task for document: {document_id}")
+        
+        # Import task locally to avoid circular dependencies
+        from backend.tasks.pdf_tasks import run_agent_analysis_task
+        
+        task = run_agent_analysis_task.delay(document_id=document.id)
+        
+        logger.info(f"Agent-only task {task.id} submitted for document {document_id}")
+        
+        return TaskSubmitResponse(
+            task_id=task.id,
+            status="queued",
+            message=f"Agent-only analysis task queued for document {document_id}",
+        )
+    except Exception as e:
+        logger.error(f"Failed to submit agent analysis task for document {document_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to queue agent analysis: {e}",
+        )
+
+
 @router.get(
     "/{document_id}/process/status/{task_id}",
     response_model=TaskStatusResponse,

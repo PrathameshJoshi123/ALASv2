@@ -13,6 +13,7 @@ from celery import chain
 from backend.celery_app import celery_app
 from celery.utils.log import get_task_logger
 
+from langchain_core.messages import HumanMessage
 from backend.services.pdf_service import PDFService
 
 logger = get_task_logger(__name__)
@@ -192,24 +193,126 @@ def process_and_chunk_task(
         elements = pdf_result.get("elements", [])
         chunk_result = chunk_document_task(document_id, elements, filename)
         
-        # Step 3: Analyze chunk contexts
-        context_result = None
+        # Step 3: Run Orchestrator Agent to perform complete contract analysis
+        agent_analysis = None
         if chunk_result.get("status") == "success":
             try:
-                logger.info(f"Triggering context analysis for document: {document_id}")
-                from backend.tasks.context_tasks import analyze_chunks_context_task
-                context_result = analyze_chunks_context_task(document_id)
-            except Exception as context_err:
-                logger.error(f"Failed context analysis in chained processing: {context_err}", exc_info=True)
-                context_result = {"status": "error", "error": str(context_err)}
+                logger.info(f"Triggering Orchestrator agent contract analysis for document: {document_id}")
+                from backend.agents.orchestrator_agent import create_contract_orchestrator
+                
+                # Instantiate and invoke orchestrator agent
+                orchestrator = create_contract_orchestrator()
+                
+                # The orchestrator uses the database tools to pull context sequentially
+                agent_msg = f"Analyze the contract with document ID: {document_id}"
+                
+                # Call orchestrator.stream to log progress in real-time
+                # Establish logging directories and file
+                log_dir = Path("backend/storage/logs")
+                log_dir.mkdir(parents=True, exist_ok=True)
+                log_file_path = log_dir / f"{document_id}_agent_execution.log"
+                
+                with open(log_file_path, "w", encoding="utf-8") as log_file:
+                    def log_write(text: str):
+                        logger.info(text)
+                        print(text)
+                        log_file.write(text + "\n")
+                        log_file.flush()
+                        
+                    log_write("="*80)
+                    log_write(f">>> STARTING DEEP AGENT CONTRACT ANALYSIS FOR DOCUMENT: {document_id}")
+                    log_write(f">>> Log file: {log_file_path}")
+                    log_write("="*80 + "\n")
+                    
+                    # Stream updates from the coordinator and all subgraphs
+                    for chunk in orchestrator.stream(
+                        {"messages": [HumanMessage(content=agent_msg)]},
+                        stream_mode="updates",
+                        subgraphs=True,
+                        version="v2",
+                    ):
+                        if not isinstance(chunk, dict) or "type" not in chunk:
+                            continue
+                            
+                        if chunk["type"] == "updates":
+                            ns = chunk.get("ns", [])
+                            data = chunk.get("data", {})
+                            
+                            # Subagent namespace identifies the active subagent
+                            if ns:
+                                subagent_name = ns[0]
+                                path_str = " -> ".join(ns)
+                                log_write(f"\n[Subagent: {path_str}] running node...")
+                                for node_name, node_data in data.items():
+                                    log_write(f"  └─ Step: {node_name}")
+                                    # Print messages / tool calls inside subagents
+                                    if isinstance(node_data, dict) and "messages" in node_data:
+                                        for msg in node_data["messages"]:
+                                            if hasattr(msg, "tool_calls") and msg.tool_calls:
+                                                for tc in msg.tool_calls:
+                                                    log_write(f"     └─ Tool Call: {tc.get('name')}")
+                                                    log_write(f"        Arguments: {json.dumps(tc.get('args'))}")
+                                            elif msg.type == "tool":
+                                                log_write(f"     └─ Tool '{msg.name}' Response snippet: {str(msg.content)[:300]}...")
+                                            elif msg.type == "ai" and msg.content:
+                                                log_write(f"     └─ AI Response snippet: {str(msg.content)[:200]}...")
+                            else:
+                                log_write("\n[Main Coordinator Agent] running node...")
+                                for node_name, node_data in data.items():
+                                    log_write(f"  └─ Step: {node_name}")
+                                    
+                                    # Accumulate/extract final structured response from the coordinator nodes
+                                    if isinstance(node_data, dict):
+                                        if "structured_response" in node_data and node_data["structured_response"] is not None:
+                                            agent_analysis = node_data["structured_response"]
+                                        elif "response" in node_data and node_data["response"] is not None:
+                                            agent_analysis = node_data["response"]
+                                            
+                                    # Look for subagent completion tool message
+                                    if node_name == "tools" and isinstance(node_data, dict) and "messages" in node_data:
+                                        for msg in node_data["messages"]:
+                                            if msg.type == "tool" and msg.name == "task":
+                                                log_write(f"\n>>> Subagent execution completed: {msg.name}")
+                                                log_write(f"    Result snippet: {str(msg.content)[:300]}...")
+                    
+                    log_write("\n" + "="*80)
+                    log_write(">>> DEEP AGENT CONTRACT ANALYSIS COMPLETE")
+                    log_write("="*80 + "\n")
+                
+                logger.info(f"Orchestrator contract analysis completed for document: {document_id}")
+            except Exception as orchestrator_err:
+                logger.error(f"Failed orchestrator analysis in chained processing: {orchestrator_err}", exc_info=True)
+                agent_analysis = {"status": "error", "error": str(orchestrator_err)}
         
-        # Combine results
+        # Save only the orchestrator agent analysis report in the storage outputs folder
+        if agent_analysis:
+            try:
+                output_dir = Path("backend/storage/outputs")
+                output_dir.mkdir(parents=True, exist_ok=True)
+                report_file = output_dir / f"{document_id}_analysis_report.json"
+                
+                # Serialize Pydantic model to dict or dump JSON directly
+                if hasattr(agent_analysis, "model_dump"):
+                    report_data = agent_analysis.model_dump()
+                else:
+                    report_data = agent_analysis
+                
+                with open(report_file, "w", encoding="utf-8") as f:
+                    json.dump(report_data, f, indent=2, ensure_ascii=False)
+                logger.info(f"Saved agent analysis report to: {report_file}")
+                return {
+                    "status": "success",
+                    "document_id": document_id,
+                    "analysis_report_file": str(report_file),
+                    "analysis": report_data
+                }
+            except Exception as report_err:
+                logger.error(f"Failed to save agent analysis report to file: {report_err}", exc_info=True)
+
         return {
-            "status": "success",
+            "status": "error",
             "document_id": document_id,
-            "pdf_result": pdf_result,
-            "chunk_result": chunk_result,
-            "context_result": context_result,
+            "error": "Agent analysis was not generated or could not be saved."
         }
         
     except Exception as e:
@@ -222,4 +325,145 @@ def process_and_chunk_task(
         }
 
 
-__all__ = ["process_pdf_task", "process_and_chunk_task"]
+@celery_app.task(bind=True, name="run_agent_analysis_task")
+def run_agent_analysis_task(
+    self,
+    document_id: str,
+) -> dict[str, Any]:
+    """
+    Background task to run Orchestrator agent contract analysis ONLY.
+    
+    Args:
+        document_id: Unique identifier for the document
+        
+    Returns:
+        Dictionary with analysis results
+    """
+    try:
+        logger.info(f"Triggering Orchestrator agent contract analysis only for document: {document_id}")
+        from backend.agents.orchestrator_agent import create_contract_orchestrator
+        
+        # Instantiate and invoke orchestrator agent
+        orchestrator = create_contract_orchestrator()
+        
+        # The orchestrator uses the database tools to pull context sequentially
+        agent_msg = f"Analyze the contract with document ID: {document_id}"
+        
+        agent_analysis = None
+        
+        # Establish logging directories and file
+        log_dir = Path("backend/storage/logs")
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file_path = log_dir / f"{document_id}_agent_execution.log"
+        
+        with open(log_file_path, "w", encoding="utf-8") as log_file:
+            def log_write(text: str):
+                logger.info(text)
+                print(text)
+                log_file.write(text + "\n")
+                log_file.flush()
+                
+            log_write("="*80)
+            log_write(f">>> STARTING DEEP AGENT CONTRACT ANALYSIS (AGENT-ONLY) FOR DOCUMENT: {document_id}")
+            log_write(f">>> Log file: {log_file_path}")
+            log_write("="*80 + "\n")
+            
+            # Stream updates from the coordinator and all subgraphs
+            for chunk in orchestrator.stream(
+                {"messages": [HumanMessage(content=agent_msg)]},
+                stream_mode="updates",
+                subgraphs=True,
+                version="v2",
+            ):
+                if not isinstance(chunk, dict) or "type" not in chunk:
+                    continue
+                    
+                if chunk["type"] == "updates":
+                    ns = chunk.get("ns", [])
+                    data = chunk.get("data", {})
+                    
+                    # Subagent namespace identifies the active subagent
+                    if ns:
+                        subagent_name = ns[0]
+                        path_str = " -> ".join(ns)
+                        log_write(f"\n[Subagent: {path_str}] running node...")
+                        for node_name, node_data in data.items():
+                            log_write(f"  └─ Step: {node_name}")
+                            # Print messages / tool calls inside subagents
+                            if isinstance(node_data, dict) and "messages" in node_data:
+                                for msg in node_data["messages"]:
+                                    if hasattr(msg, "tool_calls") and msg.tool_calls:
+                                        for tc in msg.tool_calls:
+                                            log_write(f"     └─ Tool Call: {tc.get('name')}")
+                                            log_write(f"        Arguments: {json.dumps(tc.get('args'))}")
+                                    elif msg.type == "tool":
+                                        log_write(f"     └─ Tool '{msg.name}' Response snippet: {str(msg.content)[:300]}...")
+                                    elif msg.type == "ai" and msg.content:
+                                        log_write(f"     └─ AI Response snippet: {str(msg.content)[:200]}...")
+                    else:
+                        log_write("\n[Main Coordinator Agent] running node...")
+                        for node_name, node_data in data.items():
+                            log_write(f"  └─ Step: {node_name}")
+                            
+                            # Accumulate/extract final structured response from the coordinator nodes
+                            if isinstance(node_data, dict):
+                                if "structured_response" in node_data and node_data["structured_response"] is not None:
+                                    agent_analysis = node_data["structured_response"]
+                                elif "response" in node_data and node_data["response"] is not None:
+                                    agent_analysis = node_data["response"]
+                                    
+                            # Look for subagent completion tool message
+                            if node_name == "tools" and isinstance(node_data, dict) and "messages" in node_data:
+                                for msg in node_data["messages"]:
+                                    if msg.type == "tool" and msg.name == "task":
+                                        log_write(f"\n>>> Subagent execution completed: {msg.name}")
+                                        log_write(f"    Result snippet: {str(msg.content)[:300]}...")
+            
+            log_write("\n" + "="*80)
+            log_write(">>> DEEP AGENT CONTRACT ANALYSIS COMPLETE")
+            log_write("="*80 + "\n")
+        
+        logger.info(f"Orchestrator contract analysis completed for document: {document_id}")
+        
+        # Save only the orchestrator agent analysis report in the storage outputs folder
+        if agent_analysis:
+            try:
+                output_dir = Path("backend/storage/outputs")
+                output_dir.mkdir(parents=True, exist_ok=True)
+                report_file = output_dir / f"{document_id}_analysis_report.json"
+                
+                # Serialize Pydantic model to dict or dump JSON directly
+                if hasattr(agent_analysis, "model_dump"):
+                    report_data = agent_analysis.model_dump()
+                else:
+                    report_data = agent_analysis
+                
+                with open(report_file, "w", encoding="utf-8") as f:
+                    json.dump(report_data, f, indent=2, ensure_ascii=False)
+                logger.info(f"Saved agent analysis report to: {report_file}")
+                return {
+                    "status": "success",
+                    "document_id": document_id,
+                    "analysis_report_file": str(report_file),
+                    "analysis": report_data
+                }
+            except Exception as report_err:
+                logger.error(f"Failed to save agent analysis report to file: {report_err}", exc_info=True)
+        
+        return {
+            "status": "error",
+            "document_id": document_id,
+            "error": "Agent analysis was not generated or could not be saved."
+        }
+        
+    except Exception as e:
+        error_msg = f"Failed in agent analysis task: {e}"
+        logger.error(f"Error in agent analysis task for document {document_id}: {e}", exc_info=True)
+        return {
+            "status": "error",
+            "document_id": document_id,
+            "error": error_msg,
+        }
+
+
+__all__ = ["process_pdf_task", "process_and_chunk_task", "run_agent_analysis_task"]
