@@ -192,12 +192,24 @@ def rechunk_document_task(
             documents = config_obj.process(elements, document_id, document.name)
             
             # Save new chunks
+            # Save new chunks
             chunks = save_chunks_to_db(documents, document_id, db)
             
             # Commit all changes
             db.commit()
             
             logger.info(f"Re-chunked document {document_id}: {len(chunks)} new chunks")
+            
+            # Analyze context of new chunks
+            context_summary = None
+            try:
+                logger.info(f"Analyzing chunks context for re-chunked document: {document_id}")
+                from backend.tasks.context_tasks import analyze_chunks_context_task
+                context_res = analyze_chunks_context_task(document_id)
+                context_summary = context_res
+            except Exception as e:
+                logger.error(f"Failed to analyze chunks context after re-chunking: {e}", exc_info=True)
+                context_summary = {"status": "error", "error": str(e)}
             
             # Get summary
             summary = config_obj.get_summary(documents)
@@ -208,6 +220,7 @@ def rechunk_document_task(
                 "chunks_count": len(chunks),
                 "deleted_count": deleted_count,
                 "summary": summary,
+                "context_analysis": context_summary,
             }
         
     except Exception as e:
@@ -221,3 +234,4 @@ def rechunk_document_task(
 
 
 __all__ = ["chunk_document_task", "rechunk_document_task"]
+

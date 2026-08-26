@@ -192,12 +192,24 @@ def process_and_chunk_task(
         elements = pdf_result.get("elements", [])
         chunk_result = chunk_document_task(document_id, elements, filename)
         
+        # Step 3: Analyze chunk contexts
+        context_result = None
+        if chunk_result.get("status") == "success":
+            try:
+                logger.info(f"Triggering context analysis for document: {document_id}")
+                from backend.tasks.context_tasks import analyze_chunks_context_task
+                context_result = analyze_chunks_context_task(document_id)
+            except Exception as context_err:
+                logger.error(f"Failed context analysis in chained processing: {context_err}", exc_info=True)
+                context_result = {"status": "error", "error": str(context_err)}
+        
         # Combine results
         return {
             "status": "success",
             "document_id": document_id,
             "pdf_result": pdf_result,
             "chunk_result": chunk_result,
+            "context_result": context_result,
         }
         
     except Exception as e:

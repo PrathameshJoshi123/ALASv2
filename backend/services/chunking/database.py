@@ -33,6 +33,7 @@ class Chunk(Base):
         page_end: Last page number in this chunk
         unit_type: Type of logical unit (section, clause, table, etc.)
         source_element_ids: JSON list of original Unstructured element IDs
+        sequence_number: Sequential order number within the document (1, 2, 3, ...)
         created_at: Timestamp when chunk was created
     """
     
@@ -93,6 +94,13 @@ class Chunk(Base):
         default=[],
         nullable=False,
     )
+
+    sequence_number: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        index=True,
+    )
     
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -111,6 +119,7 @@ class Chunk(Base):
         return (
             f"Chunk(id={self.id}, "
             f"document_id={self.document_id}, "
+            f"sequence={self.sequence_number}, "
             f"unit_type={self.unit_type}, "
             f"page_start={self.page_start}, "
             f"page_end={self.page_end})"
@@ -133,6 +142,7 @@ class Chunk(Base):
             "page_end": self.page_end,
             "unit_type": self.unit_type,
             "source_element_ids": self.source_element_ids,
+            "sequence_number": self.sequence_number,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 
@@ -155,7 +165,7 @@ def save_chunks_to_db(
     """
     chunks = []
     
-    for doc in documents:
+    for idx, doc in enumerate(documents, start=1):
         # Extract data from LangChain Document or dict
         if hasattr(doc, "page_content"):
             content = doc.page_content
@@ -167,7 +177,7 @@ def save_chunks_to_db(
             # Skip invalid documents
             continue
         
-        # Create Chunk object
+        # Create Chunk object with sequential number
         chunk = Chunk(
             id=str(uuid.uuid4()),
             document_id=document_id,
@@ -178,6 +188,7 @@ def save_chunks_to_db(
             page_end=metadata.get("page_end"),
             unit_type=metadata.get("chunk_type"),
             source_element_ids=metadata.get("source_element_ids", []),
+            sequence_number=idx,
         )
         
         db_session.add(chunk)
@@ -200,12 +211,12 @@ def get_chunks_by_document(
         db_session: SQLAlchemy database session
         
     Returns:
-        List of Chunk objects for the document
+        List of Chunk objects for the document, ordered by sequence_number
     """
     from sqlalchemy import select
     
     result = db_session.execute(
-        select(Chunk).where(Chunk.document_id == document_id).order_by(Chunk.created_at)
+        select(Chunk).where(Chunk.document_id == document_id).order_by(Chunk.sequence_number)
     )
     return result.scalars().all()
 

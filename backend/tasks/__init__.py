@@ -12,6 +12,7 @@ from backend.tasks.example_tasks import (
 )
 from backend.tasks.pdf_tasks import process_pdf_task, process_and_chunk_task
 from backend.tasks.chunking_tasks import chunk_document_task, rechunk_document_task
+from backend.tasks.context_tasks import analyze_chunks_context_task
 
 __all__ = [
     "celery_app",
@@ -19,6 +20,7 @@ __all__ = [
     "process_and_chunk_task",
     "chunk_document_task",
     "rechunk_document_task",
+    "analyze_chunks_context_task",
     "add_task",
     "process_file_task",
     "long_running_task",
