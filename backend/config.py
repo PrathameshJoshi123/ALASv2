@@ -54,6 +54,8 @@ class Settings(BaseSettings):
     MISTRAL_API_KEY: Optional[str] = None
     MISTRAL_MODEL: str = "mistral-large-latest"
     MISTRAL_EMBEDDING_MODEL: str = "mistral-embed"
+    MISTRAL_API_TIMEOUT: int = 180
+    MISTRAL_MAX_RETRIES: int = 5
     
     # Feature Flags
     CONTRACT_ANALYSIS_ENABLED: bool = True

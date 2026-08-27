@@ -260,6 +260,8 @@ def get_ministral_model() -> ChatMistralAI:
         model="ministral-14b-2512",
         api_key=api_key,
         temperature=0.0,
+        timeout=settings.MISTRAL_API_TIMEOUT,
+        max_retries=settings.MISTRAL_MAX_RETRIES,
     )
 
 

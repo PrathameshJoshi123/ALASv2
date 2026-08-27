@@ -251,6 +251,11 @@ class DraftContractRequest(BaseModel):
     drafting_instructions: str = Field(..., description="Drafting requirements, values, and guidelines")
 
 
+class ReiterateContractRequest(BaseModel):
+    """Request schema for contract reiteration."""
+    instructions: str = Field(..., description="Instructions / requested edits for the contract draft")
+
+
 @router.post(
     "/{document_id}/draft",
     response_model=TaskSubmitResponse,
@@ -480,3 +485,55 @@ def list_documents(
         )
         for doc in documents
     ]
+
+
+@router.post(
+    "/{document_id}/reiterate",
+    response_model=TaskSubmitResponse,
+    summary="Reiterate and apply edits to drafted contract",
+    description="Trigger the contract drafting orchestrator in reiteration mode to apply specific edits to an existing drafted contract based on user instructions.",
+)
+def reiterate_contract_endpoint(
+    document_id: str,
+    request: ReiterateContractRequest,
+    db: Session = Depends(get_db),
+) -> TaskSubmitResponse:
+    """
+    Trigger the contract reiteration/edit process.
+    """
+    # Verify document exists
+    result = db.execute(
+        select(Document).where(Document.id == document_id)
+    )
+    document = result.scalar_one_or_none()
+    
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document with ID {document_id} not found",
+        )
+        
+    try:
+        logger.info(f"Submitting contract reiteration task for document: {document_id}")
+        
+        # Import task locally to avoid circular dependencies
+        from backend.tasks import run_agent_reiteration_task
+        
+        task = run_agent_reiteration_task.delay(
+            document_id=document.id,
+            instructions=request.instructions,
+        )
+        
+        logger.info(f"Reiteration task {task.id} submitted for document {document_id}")
+        
+        return TaskSubmitResponse(
+            task_id=task.id,
+            status="queued",
+            message=f"Contract reiteration task queued for document {document_id}",
+        )
+    except Exception as e:
+        logger.error(f"Failed to submit contract reiteration task for document {document_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to queue contract reiteration: {e}",
+        )

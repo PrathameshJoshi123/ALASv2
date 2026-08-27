@@ -14,6 +14,7 @@ from langchain_quickjs import CodeInterpreterMiddleware
 
 from backend.database import SessionLocal
 from backend.services.chunking.database import Chunk
+from backend.config import settings
 
 # Import specialist agent configs
 from backend.agents.document_structure_agent import STRUCTURE_AGENT
@@ -219,7 +220,7 @@ The contract chunks are stored sequentially in the database table `chunks` with 
 # ============================================================
 
 def get_orchestrator_model() -> ChatMistralAI:
-    api_key = os.environ.get("MISTRAL_API_KEY")
+    api_key = os.environ.get("MISTRAL_API_KEY") or settings.MISTRAL_API_KEY
 
     if not api_key:
         raise RuntimeError(
@@ -231,11 +232,13 @@ def get_orchestrator_model() -> ChatMistralAI:
         model="mistral-medium-2505",
         api_key=api_key,
         temperature=0.0,
+        timeout=settings.MISTRAL_API_TIMEOUT,
+        max_retries=settings.MISTRAL_MAX_RETRIES,
     )
 
 
 def get_specialist_model() -> ChatMistralAI:
-    api_key = os.environ.get("MISTRAL_API_KEY")
+    api_key = os.environ.get("MISTRAL_API_KEY") or settings.MISTRAL_API_KEY
 
     if not api_key:
         raise RuntimeError(
@@ -247,6 +250,8 @@ def get_specialist_model() -> ChatMistralAI:
         model="ministral-14b-2512",
         api_key=api_key,
         temperature=0.0,
+        timeout=settings.MISTRAL_API_TIMEOUT,
+        max_retries=settings.MISTRAL_MAX_RETRIES,
     )
 
 

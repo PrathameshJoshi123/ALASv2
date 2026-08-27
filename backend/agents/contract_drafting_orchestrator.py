@@ -23,6 +23,7 @@ from backend.agents.contract_drafting_reviewer_agent import DRAFTING_REVIEW_AGEN
 
 # Import chunk tools from existing orchestrator
 from backend.agents.orchestrator_agent import get_optimized_chunks_from_db, get_total_chunks_count
+from backend.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -153,24 +154,28 @@ def fetch_web_page(url: str) -> str:
 # ============================================================
 
 def get_orchestrator_model() -> ChatMistralAI:
-    api_key = os.environ.get("MISTRAL_API_KEY") or os.environ.get("MISTRALAI_API_KEY")
+    api_key = os.environ.get("MISTRAL_API_KEY") or os.environ.get("MISTRALAI_API_KEY") or settings.MISTRAL_API_KEY
     if not api_key:
         raise RuntimeError("MISTRAL_API_KEY environment variable is not configured.")
     return ChatMistralAI(
         model="mistral-medium-2505",
         api_key=api_key,
         temperature=0.0,
+        timeout=settings.MISTRAL_API_TIMEOUT,
+        max_retries=settings.MISTRAL_MAX_RETRIES,
     )
 
 
 def get_specialist_model() -> ChatMistralAI:
-    api_key = os.environ.get("MISTRAL_API_KEY") or os.environ.get("MISTRALAI_API_KEY")
+    api_key = os.environ.get("MISTRAL_API_KEY") or os.environ.get("MISTRALAI_API_KEY") or settings.MISTRAL_API_KEY
     if not api_key:
         raise RuntimeError("MISTRAL_API_KEY environment variable is not configured.")
     return ChatMistralAI(
         model="ministral-14b-2512",
         api_key=api_key,
         temperature=0.0,
+        timeout=settings.MISTRAL_API_TIMEOUT,
+        max_retries=settings.MISTRAL_MAX_RETRIES,
     )
 
 
@@ -181,54 +186,81 @@ def get_specialist_model() -> ChatMistralAI:
 ORCHESTRATOR_DRAFT_PROMPT = """
 You are the Contract Drafting Orchestrator.
 
-Your goal is to coordinate a team of specialized agents to draft a high-quality, customized contract based on a user-provided PDF template (loaded via database chunks) and drafting instructions.
+Your goal is to coordinate a team of specialized agents to draft a high-quality, customized contract based on a user-provided PDF template (loaded via database chunks) and drafting instructions, or reiterate on an existing draft based on user feedback.
 
-You must decide dynamically:
-1. What sections/clauses the template possesses by delegating to the `structure-understanding-agent`.
-2. What jurisdictional regulations, governing laws, or clauses require external research. You MUST list all distinct legal domains from the template and instructions, and ask the `contract-research-agent` to run comprehensive, multi-query searches and page fetches focusing strictly on **Indian Law** and portals like **Indian Kanoon** and **India Code**.
-3. How to write and format the contract by delegating to the `contract-writer-agent`.
-4. Whether the drafted contract is accurate, complete, and free of placeholder fields by delegating to the `contract-reviewer-agent`.
-5. When the contract drafting process is complete and approved.
+PERSISTENT FILESYSTEM MEMORY:
+You have access to persistent filesystem-backed memory files:
+- `/memories/drafting_memory.md`: Stores the template structure map, research findings, and previous user instructions.
+- `/memories/drafted_contract.md`: Stores the latest drafted contract Markdown.
+
+You must handle two modes of operations:
+
+1. INITIAL DRAFTING MODE (when `/memories/drafted_contract.md` has no draft yet or is empty/default):
+   - You MUST analyze the template structure by delegating to the `structure-understanding-agent`.
+   - You MUST run legal research on Indian Law relevant to the contract by delegating to the `contract-research-agent`.
+   - Once you have the structure map and research findings, you MUST save them to `/memories/drafting_memory.md` using the `write_file` tool so they are persisted.
+   - Delegate the drafting to `contract-writer-agent`, review it with `contract-reviewer-agent`, and save the final approved contract to `/memories/drafted_contract.md` using `write_file`.
+
+2. REITERATION/EDITS MODE (when `/memories/drafted_contract.md` contains an existing draft):
+   - You MUST first read `/memories/drafting_memory.md` and `/memories/drafted_contract.md` using the `read_file` tool to understand the previous analysis and draft.
+   - AVOID calling the `structure-understanding-agent` again. AVOID calling `contract-research-agent` for initial research. The structure and legal context are already saved in `/memories/drafting_memory.md`. This avoids unnecessary/extra computation.
+   - Only call `contract-research-agent` if the user's edit instructions introduce new legal topics/clauses that were not previously researched. Otherwise, do NOT call it.
+   - Delegate the edit request directly to `contract-writer-agent`, passing the old draft from `/memories/drafted_contract.md`, the template structure, and the user's specific edit instructions.
+   - Have the `contract-reviewer-agent` review the updated draft, and then overwrite `/memories/drafted_contract.md` with the new approved contract using `write_file`.
 
 STRICT DELEGATION REQUIREMENTS:
+You MUST explicitly pass the `document_id` UUID (36-character string) in the task description to ALL specialized agents you delegate tasks to (structure-understanding-agent, contract-research-agent, contract-writer-agent, and contract-reviewer-agent) so they maintain complete document traceability.
+
 1. For `structure-understanding-agent`: You MUST explicitly pass the `document_id` UUID (36-character string) in the task description. Order the agent to fetch and read ALL database chunks sequentially from sequence 1 to the total count without skipping any. Example: "Analyze the structure of the document with ID: 2f11c7cb-22d4-475d-b8c1-9cd933c6e9ba, fetching all chunks sequentially from 1 to total."
-2. For `contract-research-agent`: You MUST request a deep-dive investigation strictly targeting **Indian Law** (and local state laws if applicable). Order the agent to formulate queries for portals like **Indian Kanoon** (`indiankanoon.org`) and **India Code** (`indiacode.nic.in`) and fetch page content. Do not search for non-Indian laws.
-3. For `contract-writer-agent`: You MUST copy and paste:
-   - The structural map of the template provided by the `structure-understanding-agent`.
-   - The detailed research findings provided by the `contract-research-agent`.
-   - The user's original drafting instructions.
+2. For `contract-research-agent`: You MUST explicitly pass the `document_id` UUID (36-character string) in the task description. Request a deep-dive investigation strictly targeting **Indian Law** (and local state laws if applicable). It is a STRICT MANDATE that the agent references **Indian Kanoon** (`site:indiankanoon.org` or `site:indiankanoon.org/doc/`) to check the **Indian Contract Act, 1872** (Indian contract law), relevant acts, case laws, and clause standards. The agent must fetch page content strictly from Indian Kanoon. Do NOT search for or use India Code (`indiacode.nic.in`). Do not search for non-Indian laws.
+3. For `contract-writer-agent`: You MUST explicitly pass the `document_id` UUID (36-character string) in the task description. You MUST copy and paste:
+   - The structural map of the template (read from `/memories/drafting_memory.md` or provided by `structure-understanding-agent`).
+   - The detailed research findings (read from `/memories/drafting_memory.md` or provided by `contract-research-agent`).
+   - The user's drafting/edit instructions.
+   - The existing contract draft (if in reiteration mode).
    Instruct the writer to match the template structure and section order exactly.
-   Example: "Draft the contract using this template structure: [Paste structure] and these research notes: [Paste research notes] and these user instructions: [Paste user instructions]".
-4. For `contract-reviewer-agent`: You MUST copy and paste:
+4. For `contract-reviewer-agent`: You MUST explicitly pass the `document_id` UUID (36-character string) in the task description. You MUST copy and paste:
    - The complete drafted contract Markdown text produced by the `contract-writer-agent`.
-   - The user's original drafting instructions.
+   - The user's original/edit instructions.
    Instruct the reviewer to perform a section-by-section comparison against the template and verify that all provisions align strictly with Indian Law.
-   Example: "Review this draft contract: [Paste drafted contract Markdown] against these user instructions: [Paste user instructions]".
 
 COORDINATION AND DELEGATION GUIDELINES:
 - Review findings carefully. If the reviewer flags gaps, simplified clauses, or empty placeholders, ask the writer to revise the contract. Do not declare complete until the reviewer gives an "APPROVED" verdict.
 """
 
-def create_contract_drafting_orchestrator() -> Any:
+def create_contract_drafting_orchestrator(document_id: str) -> Any:
     """
     Create the top-level contract-drafting orchestrator.
     """
-    from deepagents.backends import CompositeBackend, StateBackend, StoreBackend
+    from deepagents.backends import CompositeBackend, StateBackend, StoreBackend, FilesystemBackend
     
+    memory_dir = os.path.abspath(os.path.join("backend", "storage", "memories", document_id))
+    os.makedirs(memory_dir, exist_ok=True)
+    
+    # Initialize the memory files if they don't exist to prevent agent loading errors
+    drafting_memory_path = os.path.join(memory_dir, "drafting_memory.md")
+    drafted_contract_path = os.path.join(memory_dir, "drafted_contract.md")
+    
+    if not os.path.exists(drafting_memory_path):
+        with open(drafting_memory_path, "w", encoding="utf-8") as f:
+            f.write("# Contract Drafting Memory\nThis file contains the template structure and research notes for this contract.\n")
+            
+    if not os.path.exists(drafted_contract_path):
+        with open(drafted_contract_path, "w", encoding="utf-8") as f:
+            f.write("# Drafted Contract\nNo draft exists yet.\n")
+
+    skills_dir = os.path.abspath(os.path.join("backend", "skills"))
+
     backend = CompositeBackend(
         default=StateBackend(),
         routes={
-            "/memories/": StoreBackend(
-                namespace=lambda rt: (
-                    "contract-drafting",
-                    "v1",
-                ),
+            "/memories/": FilesystemBackend(
+                root_dir=memory_dir,
+                virtual_mode=True,
             ),
-            "/skills/": StoreBackend(
-                namespace=lambda rt: (
-                    "contract-drafting",
-                    "v1",
-                ),
+            "/skills/": FilesystemBackend(
+                root_dir=skills_dir,
+                virtual_mode=True,
             ),
         },
     )
@@ -279,6 +311,10 @@ If you need to query contract chunks from the database:
         subagents=specialist_agents,
         backend=backend,
         store=store,
+        memory=[
+            "/memories/drafting_memory.md",
+            "/memories/drafted_contract.md",
+        ],
         skills=[
             "backend/skills/contract-drafting-orchestration",
             "backend/skills/structure-understanding",

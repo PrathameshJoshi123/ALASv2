@@ -11,7 +11,7 @@ from backend.tasks.example_tasks import (
     send_notification_task,
 )
 from backend.tasks.pdf_tasks import process_pdf_task, process_and_chunk_task, run_agent_analysis_task
-from backend.tasks.drafting_tasks import run_agent_drafting_task
+from backend.tasks.drafting_tasks import run_agent_drafting_task, run_agent_reiteration_task
 from backend.tasks.chunking_tasks import chunk_document_task, rechunk_document_task
 from backend.tasks.context_tasks import analyze_chunks_context_task
 from backend.tasks.entity_mention_tasks import (
@@ -25,6 +25,7 @@ __all__ = [
     "process_and_chunk_task",
     "run_agent_analysis_task",
     "run_agent_drafting_task",
+    "run_agent_reiteration_task",
     "chunk_document_task",
     "rechunk_document_task",
     "analyze_chunks_context_task",
