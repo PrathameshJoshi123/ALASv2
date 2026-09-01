@@ -8,7 +8,7 @@ import logging
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Optional
 from pydantic import BaseModel, Field
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
@@ -43,6 +43,10 @@ router = APIRouter(prefix="/contracts", tags=["contracts"])
 )
 def upload_contract(
     file: UploadFile = File(..., description="PDF file to upload"),
+    counterparty_name: Optional[str] = Form(None, description="Name of the counterparty"),
+    contract_type: Optional[str] = Form(None, description="Type of contract"),
+    company_name: Optional[str] = Form(None, description="Company name"),
+    contract_prompt: Optional[str] = Form(None, description="Contract prompt or description"),
     db: Session = Depends(get_db),
 ) -> DocumentUploadResponse:
     """
@@ -53,6 +57,10 @@ def upload_contract(
     
     Args:
         file: PDF file to upload
+        counterparty_name: Name of the counterparty (optional)
+        contract_type: Type of contract (optional)
+        company_name: Company name (optional)
+        contract_prompt: Contract prompt or description (optional)
         db: Database session
         
     Returns:
@@ -97,6 +105,9 @@ def upload_contract(
             name=file.filename,
             storage_link=str(storage_path),
             date_created=datetime.utcnow(),
+            counterparty_name=counterparty_name,
+            contract_type=contract_type or "Service Agreement",
+            status="processing",  # Set status to processing since we'll trigger analysis
         )
         db.add(document)
         db.commit()
@@ -112,13 +123,38 @@ def upload_contract(
             detail=f"Failed to create document record: {e}",
         )
     
-    return DocumentUploadResponse(
-        status="success",
-        document_id=document_id,
-        document_name=file.filename,
-        storage_path=str(storage_path),
-        message="PDF contract uploaded successfully",
-    )
+    # Trigger processing task automatically after upload
+    try:
+        logger.info(f"Submitting processing task for document: {document_id}")
+        
+        # Submit the combined processing + chunking task
+        task = process_and_chunk_task.delay(
+            document_id=document.id,
+            file_path=str(storage_path),
+            filename=document.name,
+        )
+        
+        logger.info(f"Task {task.id} submitted for document {document_id} (includes auto-chunking)")
+        
+        return DocumentUploadResponse(
+            status="success",
+            document_id=document_id,
+            document_name=file.filename,
+            storage_path=str(storage_path),
+            task_id=task.id,
+            message="PDF contract uploaded successfully. Processing task triggered automatically.",
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to submit processing task for document {document_id}: {e}")
+        # Document was saved but task failed - still return success with warning
+        return DocumentUploadResponse(
+            status="success",
+            document_id=document_id,
+            document_name=file.filename,
+            storage_path=str(storage_path),
+            message=f"PDF contract uploaded successfully, but failed to trigger processing: {e}",
+        )
 
 
 @router.post(
@@ -453,6 +489,12 @@ def get_document(
         name=document.name,
         storage_link=document.storage_link,
         date_created=document.date_created.isoformat(),
+        counterparty_name=document.counterparty_name,
+        contract_type=document.contract_type,
+        status=document.status,
+        original_filename=document.name,
+        markdown_file=None,  # TODO: Add markdown_file field to Document model
+        live={},  # TODO: Add live status tracking
     )
 
 
@@ -463,28 +505,49 @@ def get_document(
 )
 def list_documents(
     db: Session = Depends(get_db),
-) -> list[DocumentResponse]:
+    page: int = 1,
+    page_size: int = 10,
+) -> dict:
     """
-    List all uploaded documents.
+    List all uploaded documents with pagination.
     
     Args:
         db: Database session
+        page: Page number (default: 1)
+        page_size: Number of items per page (default: 10)
         
     Returns:
-        List of DocumentResponse objects
+        Dictionary with items array and total count
     """
     result = db.execute(select(Document))
     documents = result.scalars().all()
     
-    return [
-        DocumentResponse(
-            id=doc.id,
-            name=doc.name,
-            storage_link=doc.storage_link,
-            date_created=doc.date_created.isoformat(),
-        )
-        for doc in documents
-    ]
+    # Calculate pagination
+    total = len(documents)
+    start = (page - 1) * page_size
+    end = start + page_size
+    paginated_docs = documents[start:end]
+    
+    return {
+        "items": [
+            DocumentResponse(
+                id=doc.id,
+                name=doc.name,
+                storage_link=doc.storage_link,
+                date_created=doc.date_created.isoformat(),
+                counterparty_name=doc.counterparty_name,
+                contract_type=doc.contract_type,
+                status=doc.status,
+                original_filename=doc.name,
+                markdown_file=None,  # TODO: Add markdown_file field to Document model
+                live={},  # TODO: Add live status tracking
+            )
+            for doc in paginated_docs
+        ],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
 
 
 @router.post(

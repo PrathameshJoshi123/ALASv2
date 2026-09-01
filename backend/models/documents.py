@@ -4,15 +4,16 @@ Document model for storing PDF contracts and their metadata.
 
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional
 
 from sqlalchemy import String, DateTime, Text
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, foreign
 
 from backend.database import Base
 
 if TYPE_CHECKING:
     from backend.services.chunking.database import Chunk
+    from backend.models.contract_analysis import ContractAnalysis
 
 
 class Document(Base):
@@ -52,6 +53,21 @@ class Document(Base):
         nullable=False,
     )
     
+    counterparty_name: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+    contract_type: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+        default="Service Agreement",
+    )
+    status: Mapped[str] = mapped_column(
+        String(50),
+        default="uploaded",
+        nullable=False,
+    )
+    
     # Relationship to chunks (using forward reference to avoid circular import)
     chunks: Mapped[list["Chunk"]] = relationship(
         "Chunk",
@@ -59,5 +75,13 @@ class Document(Base):
         cascade="all, delete-orphan",
     )
     
+    # Relationship to analysis (one-to-one)
+    analysis: Mapped[Optional["ContractAnalysis"]] = relationship(
+        "ContractAnalysis",
+        primaryjoin="Document.id == foreign(ContractAnalysis.document_id)",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+    
     def __repr__(self) -> str:
-        return f"Document(id={self.id}, name={self.name}, storage_link={self.storage_link})"
+        return f"Document(id={self.id}, name={self.name}, status={self.status}, storage_link={self.storage_link})"
