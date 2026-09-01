@@ -58,6 +58,12 @@ class DocumentResponse(BaseModel):
     name: str = Field(..., description="Name of the document")
     storage_link: str = Field(..., description="Path to the stored PDF file")
     date_created: str = Field(..., description="Timestamp when document was created")
+    counterparty_name: Optional[str] = Field(None, description="Name of the counterparty")
+    contract_type: Optional[str] = Field(None, description="Type of contract")
+    status: Optional[str] = Field(None, description="Current status of the document")
+    markdown_file: Optional[str] = Field(None, description="Path to markdown version of the document")
+    original_filename: Optional[str] = Field(None, description="Original filename of the uploaded document")
+    live: Optional[dict] = Field(None, description="Live processing status information")
 
 
 class DocumentUploadResponse(BaseModel):
@@ -67,6 +73,7 @@ class DocumentUploadResponse(BaseModel):
     document_id: str = Field(..., description="Unique document identifier")
     document_name: str = Field(..., description="Name of the uploaded document")
     storage_path: str = Field(..., description="Path where file was stored")
+    task_id: Optional[str] = Field(None, description="Celery task ID for processing task")
     message: Optional[str] = Field(None, description="Additional message")
 
 
