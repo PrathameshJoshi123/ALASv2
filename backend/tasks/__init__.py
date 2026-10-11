@@ -18,6 +18,10 @@ from backend.tasks.entity_mention_tasks import (
     analyze_single_chunk_entities_task,
     analyze_document_entities_task,
 )
+from backend.tasks.case_tasks import (
+    process_case_document_task,
+    analyze_case_task,
+)
 
 __all__ = [
     "celery_app",
@@ -31,6 +35,8 @@ __all__ = [
     "analyze_chunks_context_task",
     "analyze_single_chunk_entities_task",
     "analyze_document_entities_task",
+    "process_case_document_task",
+    "analyze_case_task",
     "add_task",
     "process_file_task",
     "long_running_task",

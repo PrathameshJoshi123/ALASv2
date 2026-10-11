@@ -32,10 +32,13 @@ elif database_url.startswith("sqlite"):
     # Keep SQLite as-is for sync
     pass
 
+import logging
+logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+
 # Create sync engine
 engine = create_engine(
     database_url,
-    echo=settings.DEBUG,
+    echo=False,
     pool_pre_ping=True,
     pool_size=5,
     max_overflow=10,
@@ -98,11 +101,15 @@ def get_db_context() -> Generator[Session, None, None]:
 
 def init_db() -> None:
     """
-    Initialize database tables.
-    Create all tables defined in models.
+    Initialize database tables and run column migrations for missing fields.
     """
     Base.metadata.create_all(bind=engine)
-    print("Database tables created successfully.")
+    try:
+        from backend.database_migrations.create_contract_analysis_tables import create_tables_if_not_exist
+        create_tables_if_not_exist()
+    except Exception as e:
+        print(f"Warning: automatic schema migration check failed: {e}")
+    print("Database tables created and initialized successfully.")
 
 
 def drop_db() -> None:

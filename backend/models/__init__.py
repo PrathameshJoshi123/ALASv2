@@ -7,6 +7,7 @@ from backend.database import Base
 from backend.models.documents import Document
 from backend.models.chunk_context import ChunkContext
 from backend.models.entity_mention import EntityMention
+from backend.models.cases import Case, CaseDocument, CaseDocumentChunk, EvidenceDetail, CaseTimeline, CaseAnalysis, CaseAgentMemory
 
 # Import Chunk model from chunking service
 try:
@@ -16,7 +17,19 @@ except ImportError:
     Chunk = None
     _HAS_CHUNK = False
 
-__all__ = ["Base", "Document", "ChunkContext", "EntityMention"]
+__all__ = [
+    "Base", 
+    "Document", 
+    "ChunkContext", 
+    "EntityMention",
+    "Case",
+    "CaseDocument",
+    "CaseDocumentChunk",
+    "EvidenceDetail",
+    "CaseTimeline",
+    "CaseAnalysis",
+    "CaseAgentMemory"
+]
 if _HAS_CHUNK:
     __all__.append("Chunk")
 

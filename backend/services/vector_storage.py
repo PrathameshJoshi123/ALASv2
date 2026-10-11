@@ -12,12 +12,15 @@ from langchain_mistralai import MistralAIEmbeddings
 from backend.config import settings
 from backend.services.chunking.database import Chunk
 
+import functools
 logger = logging.getLogger(__name__)
 
 
+@functools.lru_cache(maxsize=1)
 def get_embeddings_model() -> Any:
     """
     Initialize the nomic-embed-text embedding model directly using sentence-transformers.
+    Cached in memory to prevent re-loading on every retrieval query.
     """
     from langchain_community.embeddings import HuggingFaceEmbeddings
     logger.info("Loading nomic-embed-text via sentence-transformers (HuggingFace)...")
@@ -27,9 +30,10 @@ def get_embeddings_model() -> Any:
     )
 
 
+@functools.lru_cache(maxsize=1)
 def get_vector_store() -> Chroma:
     """
-    Initialize the Chroma vector store.
+    Initialize the Chroma vector store. Cached in memory for fast similarity search.
     """
     embeddings = get_embeddings_model()
     # Ensure CHROMA_DIR is created

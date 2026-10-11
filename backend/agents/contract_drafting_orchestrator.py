@@ -153,30 +153,16 @@ def fetch_web_page(url: str) -> str:
 # Models
 # ============================================================
 
-def get_orchestrator_model() -> ChatMistralAI:
-    api_key = os.environ.get("MISTRAL_API_KEY") or os.environ.get("MISTRALAI_API_KEY") or settings.MISTRAL_API_KEY
-    if not api_key:
-        raise RuntimeError("MISTRAL_API_KEY environment variable is not configured.")
-    return ChatMistralAI(
-        model="mistral-medium-2505",
-        api_key=api_key,
-        temperature=0.0,
-        timeout=settings.MISTRAL_API_TIMEOUT,
-        max_retries=settings.MISTRAL_MAX_RETRIES,
-    )
+def get_orchestrator_model() -> Any:
+    """Orchestrator main agent model: ministral-14b-2512 with exponential backoff retries."""
+    from backend.utils.llm_utils import get_resilient_llm, ORCHESTRATOR_MODEL_NAME
+    return get_resilient_llm(model_name=ORCHESTRATOR_MODEL_NAME, temperature=0.0)
 
 
-def get_specialist_model() -> ChatMistralAI:
-    api_key = os.environ.get("MISTRAL_API_KEY") or os.environ.get("MISTRALAI_API_KEY") or settings.MISTRAL_API_KEY
-    if not api_key:
-        raise RuntimeError("MISTRAL_API_KEY environment variable is not configured.")
-    return ChatMistralAI(
-        model="ministral-14b-2512",
-        api_key=api_key,
-        temperature=0.0,
-        timeout=settings.MISTRAL_API_TIMEOUT,
-        max_retries=settings.MISTRAL_MAX_RETRIES,
-    )
+def get_specialist_model() -> Any:
+    """Specialist subagent model: ministral-3b-2512 with exponential backoff retries."""
+    from backend.utils.llm_utils import get_resilient_llm, SPECIALIST_MODEL_NAME
+    return get_resilient_llm(model_name=SPECIALIST_MODEL_NAME, temperature=0.0)
 
 
 # ============================================================

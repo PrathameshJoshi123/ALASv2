@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import uuid
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field
@@ -33,6 +34,48 @@ load_dotenv()
 # Structured result returned by the orchestrator
 # ============================================================
 
+class ClauseAnalysisItem(BaseModel):
+    """Clause-by-clause analysis item."""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    clause_number: int = 1
+    clause_type: str = "general"
+    section_title: str = "Clause"
+    raw_text: str = ""
+    severity: str = "LOW"  # CRITICAL, HIGH, MEDIUM, LOW, INFO
+    risk_description: str = ""
+    legal_reasoning: str = ""
+    confidence_score: float = 0.0
+
+
+class ObligationItem(BaseModel):
+    """Obligation item."""
+    description: str = ""
+    category: Optional[str] = Field(
+        default="General",
+        description="Category such as 'Payment & Financial', 'Performance & Delivery', 'Maintenance & Services', 'Compliance & Legal', 'General'"
+    )
+    actor: Optional[str] = None
+    action: Optional[str] = None
+    beneficiary: Optional[str] = None
+    deadline: Optional[str] = None
+    trigger: Optional[str] = None
+    citation: Optional[str] = None
+
+
+class RiskItem(BaseModel):
+    """Risk item."""
+    description: str = ""
+    category: Optional[str] = Field(
+        default="General",
+        description="Category such as 'Financial & Payment', 'Construction & Title', 'Compliance & Legal', 'Operational & Facility', 'General'"
+    )
+    severity: Optional[str] = "MEDIUM"
+    affected_party: Optional[str] = None
+    mechanism: Optional[str] = None
+    mitigation: Optional[str] = None
+    citation: Optional[str] = None
+
+
 class ContractAnalysisResult(BaseModel):
     """
     Final result produced by the contract analysis orchestrator.
@@ -42,11 +85,25 @@ class ContractAnalysisResult(BaseModel):
 
     parties: list[str] = Field(default_factory=list)
 
+    overall_risk_score: float = Field(
+        default=0.0,
+        description="Overall risk score percentage from 0.0 to 100.0",
+    )
+
+    critical_issues: int = 0
+    high_issues: int = 0
+    medium_issues: int = 0
+    low_issues: int = 0
+
     key_findings: list[str] = Field(default_factory=list)
 
-    obligations: list[str] = Field(default_factory=list)
+    recommended_actions: list[str] = Field(default_factory=list)
 
-    risks: list[str] = Field(default_factory=list)
+    clauses: list[ClauseAnalysisItem] = Field(default_factory=list)
+
+    obligations: list[ObligationItem] = Field(default_factory=list)
+
+    risks: list[RiskItem] = Field(default_factory=list)
 
     unresolved_questions: list[str] = Field(default_factory=list)
 
@@ -212,6 +269,16 @@ The contract chunks are stored sequentially in the database table `chunks` with 
 2. ALWAYS retrieve chunks in batches by calling `get_optimized_chunks_from_db`. Set the `limit` parameter to a maximum of 15 to 20 chunks per call. NEVER request all chunks at once (e.g. limit=100+).
 3. Decide dynamically which sequential parts of the document you need to pull context from.
 4. IMPORTANT: You MUST continue fetching and analyzing chunks sequentially from `start_sequence = 1` in batches up to the total count of chunks. Do not query beyond the total chunk count. Do not stop midway.
+
+FINAL ANALYSIS OUTPUT REQUIREMENTS:
+- Calculate an `overall_risk_score` from 0.0 to 100.0 based on severity and density of identified risks.
+- Count the number of `critical_issues`, `high_issues`, `medium_issues`, and `low_issues`.
+- Provide concrete `recommended_actions` as a list of actionable advice items for legal/contract managers.
+- Populate `clauses`: a list of clause objects containing section_title, clause_type, raw_text snippet, severity (CRITICAL, HIGH, MEDIUM, LOW, INFO), risk_description, and legal_reasoning.
+- Populate `key_findings`: concise, high-impact key findings extracted from the contract.
+- Populate `obligations` with detailed items and explicit `category` values (e.g., 'Payment & Financial', 'Performance & Delivery', 'Maintenance & Services', 'Compliance & Legal', 'General').
+- Populate `risks` with detailed items and explicit `category` values (e.g., 'Financial & Payment', 'Construction & Title', 'Compliance & Legal', 'Operational & Facility', 'General') and severity levels.
+- Populate `unresolved_questions`: actionable questions, ambiguities, or gaps to clarify and improve the contract terms.
 """
 
 
@@ -219,40 +286,16 @@ The contract chunks are stored sequentially in the database table `chunks` with 
 # Models
 # ============================================================
 
-def get_orchestrator_model() -> ChatMistralAI:
-    api_key = os.environ.get("MISTRAL_API_KEY") or settings.MISTRAL_API_KEY
-
-    if not api_key:
-        raise RuntimeError(
-            "MISTRAL_API_KEY environment variable is not configured."
-        )
-
-    # Orchestrator, Review and Cross-Reference agents use mistral-medium-2505
-    return ChatMistralAI(
-        model="mistral-medium-2505",
-        api_key=api_key,
-        temperature=0.0,
-        timeout=settings.MISTRAL_API_TIMEOUT,
-        max_retries=settings.MISTRAL_MAX_RETRIES,
-    )
+def get_orchestrator_model() -> Any:
+    """Orchestrator main agent model: ministral-14b-2512 with exponential backoff retries."""
+    from backend.utils.llm_utils import get_resilient_llm, ORCHESTRATOR_MODEL_NAME
+    return get_resilient_llm(model_name=ORCHESTRATOR_MODEL_NAME, temperature=0.0)
 
 
-def get_specialist_model() -> ChatMistralAI:
-    api_key = os.environ.get("MISTRAL_API_KEY") or settings.MISTRAL_API_KEY
-
-    if not api_key:
-        raise RuntimeError(
-            "MISTRAL_API_KEY environment variable is not configured."
-        )
-
-    # Other specialists use ministral-14b-2512
-    return ChatMistralAI(
-        model="ministral-14b-2512",
-        api_key=api_key,
-        temperature=0.0,
-        timeout=settings.MISTRAL_API_TIMEOUT,
-        max_retries=settings.MISTRAL_MAX_RETRIES,
-    )
+def get_specialist_model() -> Any:
+    """Specialist subagent model: ministral-3b-2512 with exponential backoff retries."""
+    from backend.utils.llm_utils import get_resilient_llm, SPECIALIST_MODEL_NAME
+    return get_resilient_llm(model_name=SPECIALIST_MODEL_NAME, temperature=0.0)
 
 
 # ============================================================

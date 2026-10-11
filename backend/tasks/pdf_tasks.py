@@ -15,6 +15,7 @@ from celery.utils.log import get_task_logger
 
 from langchain_core.messages import HumanMessage
 from backend.services.pdf_service import PDFService
+from backend.utils.llm_utils import execute_with_exponential_backoff
 
 logger = get_task_logger(__name__)
 
@@ -224,57 +225,61 @@ def process_and_chunk_task(
                     log_write(f">>> Log file: {log_file_path}")
                     log_write("="*80 + "\n")
                     
-                    # Stream updates from the coordinator and all subgraphs
-                    for chunk in orchestrator.stream(
-                        {"messages": [HumanMessage(content=agent_msg)]},
-                        stream_mode="updates",
-                        subgraphs=True,
-                        version="v2",
-                    ):
-                        if not isinstance(chunk, dict) or "type" not in chunk:
-                            continue
-                            
-                        if chunk["type"] == "updates":
-                            ns = chunk.get("ns", [])
-                            data = chunk.get("data", {})
-                            
-                            # Subagent namespace identifies the active subagent
-                            if ns:
-                                subagent_name = ns[0]
-                                path_str = " -> ".join(ns)
-                                log_write(f"\n[Subagent: {path_str}] running node...")
-                                for node_name, node_data in data.items():
-                                    log_write(f"  └─ Step: {node_name}")
-                                    # Print messages / tool calls inside subagents
-                                    if isinstance(node_data, dict) and "messages" in node_data:
-                                        for msg in node_data["messages"]:
-                                            if hasattr(msg, "tool_calls") and msg.tool_calls:
-                                                for tc in msg.tool_calls:
-                                                    log_write(f"     └─ Tool Call: {tc.get('name')}")
-                                                    log_write(f"        Arguments: {json.dumps(tc.get('args'))}")
-                                            elif msg.type == "tool":
-                                                log_write(f"     └─ Tool '{msg.name}' Response snippet: {str(msg.content)[:300]}...")
-                                            elif msg.type == "ai" and msg.content:
-                                                log_write(f"     └─ AI Response snippet: {str(msg.content)[:200]}...")
-                            else:
-                                log_write("\n[Main Coordinator Agent] running node...")
-                                for node_name, node_data in data.items():
-                                    log_write(f"  └─ Step: {node_name}")
-                                    
-                                    # Accumulate/extract final structured response from the coordinator nodes
-                                    if isinstance(node_data, dict):
-                                        if "structured_response" in node_data and node_data["structured_response"] is not None:
-                                            agent_analysis = node_data["structured_response"]
-                                        elif "response" in node_data and node_data["response"] is not None:
-                                            agent_analysis = node_data["response"]
-                                            
-                                    # Look for subagent completion tool message
-                                    if node_name == "tools" and isinstance(node_data, dict) and "messages" in node_data:
-                                        for msg in node_data["messages"]:
-                                            if msg.type == "tool" and msg.name == "task":
-                                                log_write(f"\n>>> Subagent execution completed: {msg.name}")
-                                                log_write(f"    Result snippet: {str(msg.content)[:300]}...")
-                    
+                    # Stream updates from the coordinator and all subgraphs with exponential backoff retry
+                    def run_stream_analysis():
+                        nonlocal agent_analysis
+                        for chunk in orchestrator.stream(
+                            {"messages": [HumanMessage(content=agent_msg)]},
+                            stream_mode="updates",
+                            subgraphs=True,
+                            version="v2",
+                        ):
+                            if not isinstance(chunk, dict) or "type" not in chunk:
+                                continue
+                                
+                            if chunk["type"] == "updates":
+                                ns = chunk.get("ns", [])
+                                data = chunk.get("data", {})
+                                
+                                # Subagent namespace identifies the active subagent
+                                if ns:
+                                    subagent_name = ns[0]
+                                    path_str = " -> ".join(ns)
+                                    log_write(f"\n[Subagent: {path_str}] running node...")
+                                    for node_name, node_data in data.items():
+                                        log_write(f"  └─ Step: {node_name}")
+                                        # Print messages / tool calls inside subagents
+                                        if isinstance(node_data, dict) and "messages" in node_data:
+                                            for msg in node_data["messages"]:
+                                                if hasattr(msg, "tool_calls") and msg.tool_calls:
+                                                    for tc in msg.tool_calls:
+                                                        log_write(f"     └─ Tool Call: {tc.get('name')}")
+                                                        log_write(f"        Arguments: {json.dumps(tc.get('args'))}")
+                                                elif msg.type == "tool":
+                                                    log_write(f"     └─ Tool '{msg.name}' Response snippet: {str(msg.content)[:300]}...")
+                                                elif msg.type == "ai" and msg.content:
+                                                    log_write(f"     └─ AI Response snippet: {str(msg.content)[:200]}...")
+                                else:
+                                    log_write("\n[Main Coordinator Agent] running node...")
+                                    for node_name, node_data in data.items():
+                                        log_write(f"  └─ Step: {node_name}")
+                                        
+                                        # Accumulate/extract final structured response from the coordinator nodes
+                                        if isinstance(node_data, dict):
+                                            if "structured_response" in node_data and node_data["structured_response"] is not None:
+                                                agent_analysis = node_data["structured_response"]
+                                            elif "response" in node_data and node_data["response"] is not None:
+                                                agent_analysis = node_data["response"]
+                                                
+                                        # Look for subagent completion tool message
+                                        if node_name == "tools" and isinstance(node_data, dict) and "messages" in node_data:
+                                            for msg in node_data["messages"]:
+                                                if msg.type == "tool" and msg.name == "task":
+                                                    log_write(f"\n>>> Subagent execution completed: {msg.name}")
+                                                    log_write(f"    Result snippet: {str(msg.content)[:300]}...")
+
+                    execute_with_exponential_backoff(run_stream_analysis)
+
                     log_write("\n" + "="*80)
                     log_write(">>> DEEP AGENT CONTRACT ANALYSIS COMPLETE")
                     log_write("="*80 + "\n")
@@ -282,7 +287,7 @@ def process_and_chunk_task(
                 logger.info(f"Orchestrator contract analysis completed for document: {document_id}")
             except Exception as orchestrator_err:
                 logger.error(f"Failed orchestrator analysis in chained processing: {orchestrator_err}", exc_info=True)
-                agent_analysis = {"status": "error", "error": str(orchestrator_err)}
+                agent_analysis = {"status": "degraded", "error": str(orchestrator_err)}
         
         # Save only the orchestrator agent analysis report in the storage outputs folder
         if agent_analysis:
@@ -374,57 +379,61 @@ def run_agent_analysis_task(
             log_write(f">>> Log file: {log_file_path}")
             log_write("="*80 + "\n")
             
-            # Stream updates from the coordinator and all subgraphs
-            for chunk in orchestrator.stream(
-                {"messages": [HumanMessage(content=agent_msg)]},
-                stream_mode="updates",
-                subgraphs=True,
-                version="v2",
-            ):
-                if not isinstance(chunk, dict) or "type" not in chunk:
-                    continue
-                    
-                if chunk["type"] == "updates":
-                    ns = chunk.get("ns", [])
-                    data = chunk.get("data", {})
-                    
-                    # Subagent namespace identifies the active subagent
-                    if ns:
-                        subagent_name = ns[0]
-                        path_str = " -> ".join(ns)
-                        log_write(f"\n[Subagent: {path_str}] running node...")
-                        for node_name, node_data in data.items():
-                            log_write(f"  └─ Step: {node_name}")
-                            # Print messages / tool calls inside subagents
-                            if isinstance(node_data, dict) and "messages" in node_data:
-                                for msg in node_data["messages"]:
-                                    if hasattr(msg, "tool_calls") and msg.tool_calls:
-                                        for tc in msg.tool_calls:
-                                            log_write(f"     └─ Tool Call: {tc.get('name')}")
-                                            log_write(f"        Arguments: {json.dumps(tc.get('args'))}")
-                                    elif msg.type == "tool":
-                                        log_write(f"     └─ Tool '{msg.name}' Response snippet: {str(msg.content)[:300]}...")
-                                    elif msg.type == "ai" and msg.content:
-                                        log_write(f"     └─ AI Response snippet: {str(msg.content)[:200]}...")
-                    else:
-                        log_write("\n[Main Coordinator Agent] running node...")
-                        for node_name, node_data in data.items():
-                            log_write(f"  └─ Step: {node_name}")
-                            
-                            # Accumulate/extract final structured response from the coordinator nodes
-                            if isinstance(node_data, dict):
-                                if "structured_response" in node_data and node_data["structured_response"] is not None:
-                                    agent_analysis = node_data["structured_response"]
-                                elif "response" in node_data and node_data["response"] is not None:
-                                    agent_analysis = node_data["response"]
-                                    
-                            # Look for subagent completion tool message
-                            if node_name == "tools" and isinstance(node_data, dict) and "messages" in node_data:
-                                for msg in node_data["messages"]:
-                                    if msg.type == "tool" and msg.name == "task":
-                                        log_write(f"\n>>> Subagent execution completed: {msg.name}")
-                                        log_write(f"    Result snippet: {str(msg.content)[:300]}...")
-            
+            # Stream updates from the coordinator and all subgraphs with exponential backoff retry
+            def run_stream_analysis_only():
+                nonlocal agent_analysis
+                for chunk in orchestrator.stream(
+                    {"messages": [HumanMessage(content=agent_msg)]},
+                    stream_mode="updates",
+                    subgraphs=True,
+                    version="v2",
+                ):
+                    if not isinstance(chunk, dict) or "type" not in chunk:
+                        continue
+                        
+                    if chunk["type"] == "updates":
+                        ns = chunk.get("ns", [])
+                        data = chunk.get("data", {})
+                        
+                        # Subagent namespace identifies the active subagent
+                        if ns:
+                            subagent_name = ns[0]
+                            path_str = " -> ".join(ns)
+                            log_write(f"\n[Subagent: {path_str}] running node...")
+                            for node_name, node_data in data.items():
+                                log_write(f"  └─ Step: {node_name}")
+                                # Print messages / tool calls inside subagents
+                                if isinstance(node_data, dict) and "messages" in node_data:
+                                    for msg in node_data["messages"]:
+                                        if hasattr(msg, "tool_calls") and msg.tool_calls:
+                                            for tc in msg.tool_calls:
+                                                log_write(f"     └─ Tool Call: {tc.get('name')}")
+                                                log_write(f"        Arguments: {json.dumps(tc.get('args'))}")
+                                        elif msg.type == "tool":
+                                            log_write(f"     └─ Tool '{msg.name}' Response snippet: {str(msg.content)[:300]}...")
+                                        elif msg.type == "ai" and msg.content:
+                                            log_write(f"     └─ AI Response snippet: {str(msg.content)[:200]}...")
+                        else:
+                            log_write("\n[Main Coordinator Agent] running node...")
+                            for node_name, node_data in data.items():
+                                log_write(f"  └─ Step: {node_name}")
+                                
+                                # Accumulate/extract final structured response from the coordinator nodes
+                                if isinstance(node_data, dict):
+                                    if "structured_response" in node_data and node_data["structured_response"] is not None:
+                                        agent_analysis = node_data["structured_response"]
+                                    elif "response" in node_data and node_data["response"] is not None:
+                                        agent_analysis = node_data["response"]
+                                        
+                                # Look for subagent completion tool message
+                                if node_name == "tools" and isinstance(node_data, dict) and "messages" in node_data:
+                                    for msg in node_data["messages"]:
+                                        if msg.type == "tool" and msg.name == "task":
+                                            log_write(f"\n>>> Subagent execution completed: {msg.name}")
+                                            log_write(f"    Result snippet: {str(msg.content)[:300]}...")
+
+            execute_with_exponential_backoff(run_stream_analysis_only)
+
             log_write("\n" + "="*80)
             log_write(">>> DEEP AGENT CONTRACT ANALYSIS COMPLETE")
             log_write("="*80 + "\n")

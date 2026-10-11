@@ -6,6 +6,7 @@ All FastAPI route modules should be defined here.
 from backend.routes.api import router as api_router
 from backend.routes.contracts import router as contracts_router
 from backend.routes.tasks import router as tasks_router
+from backend.routes.cases import router as cases_router
 
 # Import chunking router if available
 try:
@@ -15,6 +16,6 @@ except ImportError:
     chunking_router = None
     _HAS_CHUNKING = False
 
-__all__ = ["api_router", "contracts_router", "tasks_router"]
+__all__ = ["api_router", "contracts_router", "tasks_router", "cases_router"]
 if _HAS_CHUNKING:
     __all__.append("chunking_router")

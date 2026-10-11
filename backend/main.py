@@ -30,6 +30,7 @@ logging.basicConfig(
     level=logging.INFO if settings.DEBUG else logging.WARNING,
     format="[%(asctime)s] %(levelname)s in %(module)s: %(message)s",
 )
+logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 
@@ -208,10 +209,11 @@ async def api_info() -> dict:
 
 
 # Include API routers
-from backend.routes import api_router, contracts_router, tasks_router
+from backend.routes import api_router, contracts_router, tasks_router, cases_router
 
 app.include_router(api_router, prefix="/api/v1", tags=["api"])
 app.include_router(contracts_router, prefix="/api/v1", tags=["contracts"])
+app.include_router(cases_router, prefix="/api/v1", tags=["cases"])
 app.include_router(tasks_router, prefix="/tasks", tags=["tasks"])
 
 # Include chunking router if available

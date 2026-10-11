@@ -56,8 +56,25 @@ class DocumentResponse(BaseModel):
     
     id: str = Field(..., description="Unique document identifier")
     name: str = Field(..., description="Name of the document")
+    original_filename: Optional[str] = Field(None, description="Original filename of the document")
+    markdown_file: Optional[str] = Field(None, description="Associated markdown filename")
     storage_link: str = Field(..., description="Path to the stored PDF file")
     date_created: str = Field(..., description="Timestamp when document was created")
+    created_at: Optional[str] = Field(None, description="Timestamp ISO string")
+    counterparty_name: Optional[str] = Field(None, description="Counterparty name")
+    company_name: Optional[str] = Field(None, description="Company name")
+    contract_type: Optional[str] = Field(None, description="Contract type")
+    status: str = Field("UPLOADED", description="Document processing status")
+    live: Optional[dict[str, Any]] = Field(default_factory=dict, description="Live worker status")
+    overall_risk_score: Optional[float] = Field(0.0, description="Overall risk score percentage")
+    critical_issues: Optional[int] = Field(0, description="Critical issues count")
+    high_issues: Optional[int] = Field(0, description="High issues count")
+    medium_issues: Optional[int] = Field(0, description="Medium issues count")
+    low_issues: Optional[int] = Field(0, description="Low issues count")
+    analysis_summary: Optional[str] = Field("", description="Summary of contract analysis")
+    recommended_actions: Optional[list[str]] = Field(default_factory=list, description="Recommended actions")
+    clauses: Optional[list[dict[str, Any]]] = Field(default_factory=list, description="Clauses analysis list")
+    analysis: Optional[dict[str, Any]] = Field(None, description="Raw DB analysis dictionary")
 
 
 class DocumentUploadResponse(BaseModel):
@@ -67,6 +84,7 @@ class DocumentUploadResponse(BaseModel):
     document_id: str = Field(..., description="Unique document identifier")
     document_name: str = Field(..., description="Name of the uploaded document")
     storage_path: str = Field(..., description="Path where file was stored")
+    task_id: Optional[str] = Field(None, description="Celery task ID for background analysis")
     message: Optional[str] = Field(None, description="Additional message")
 
 

@@ -58,6 +58,44 @@ class ContractAnalysis(Base):
         nullable=False,
     )
     
+    overall_risk_score: Mapped[float] = mapped_column(
+        Float,
+        default=0.0,
+        nullable=False,
+    )
+    
+    critical_issues: Mapped[int] = mapped_column(
+        default=0,
+        nullable=False,
+    )
+    
+    high_issues: Mapped[int] = mapped_column(
+        default=0,
+        nullable=False,
+    )
+    
+    medium_issues: Mapped[int] = mapped_column(
+        default=0,
+        nullable=False,
+    )
+    
+    low_issues: Mapped[int] = mapped_column(
+        default=0,
+        nullable=False,
+    )
+    
+    recommended_actions: Mapped[list[str]] = mapped_column(
+        JSON,
+        default=list,
+        nullable=False,
+    )
+    
+    clauses: Mapped[list[dict]] = mapped_column(
+        JSON,
+        default=list,
+        nullable=False,
+    )
+    
     confidence: Mapped[float] = mapped_column(
         Float,
         default=0.0,
@@ -145,6 +183,12 @@ class ContractObligation(Base):
         nullable=False,
     )
     
+    category: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+        default="General",
+    )
+    
     # Store other fields like actor, action, beneficiary, trigger, citation in details
     details: Mapped[dict[str, Any]] = mapped_column(
         JSON,
@@ -204,6 +248,12 @@ class ContractRisk(Base):
     severity: Mapped[Optional[str]] = mapped_column(
         String(50),
         nullable=True,
+    )
+    
+    category: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+        default="General",
     )
     
     # Store other fields like affected_party, mechanism, evidence, mitigations in details

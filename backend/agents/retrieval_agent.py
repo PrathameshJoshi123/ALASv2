@@ -65,22 +65,52 @@ class SimpleBM25:
         return scores
 
 
+ENGLISH_STOP_WORDS = {
+    "a", "about", "above", "after", "again", "against", "all", "am", "an", "and",
+    "any", "are", "aren't", "as", "at", "be", "because", "been", "before", "being",
+    "below", "between", "both", "but", "by", "can", "cannot", "could", "did", "do",
+    "does", "doing", "down", "during", "each", "few", "for", "from", "further", "had",
+    "has", "have", "having", "he", "her", "here", "hers", "herself", "him", "himself",
+    "his", "how", "i", "if", "in", "into", "is", "it", "its", "itself", "me", "more",
+    "most", "my", "myself", "no", "nor", "not", "of", "off", "on", "once", "only", "or",
+    "other", "ought", "our", "ours", "ourselves", "out", "over", "own", "same", "she",
+    "should", "so", "some", "such", "than", "that", "the", "their", "theirs", "them",
+    "themselves", "then", "there", "these", "they", "this", "those", "through", "to",
+    "too", "under", "until", "up", "very", "was", "we", "were", "what", "when", "where",
+    "which", "while", "who", "whom", "why", "with", "would", "you", "your", "yours"
+}
+
+
+def clean_and_stem_tokens(text: str) -> List[str]:
+    """Extract tokens, remove stopwords, and normalize prefixes for BM25 matching."""
+    raw_tokens = re.findall(r'\w+', text.lower())
+    clean_tokens = []
+    for token in raw_tokens:
+        if token in ENGLISH_STOP_WORDS or len(token) < 2:
+            continue
+        stemmed = token[:5] if len(token) > 6 else token
+        clean_tokens.append(stemmed)
+    return clean_tokens or raw_tokens
+
+
 # ============================================================
 # Retrieval & Search Tools
 # ============================================================
 
-def search_chunks_vector_db(document_id: str, query: str, limit: int = 5) -> List[Dict[str, Any]]:
+def search_chunks_vector_db(document_id: str, query: str, limit: int = 10) -> List[Dict[str, Any]]:
     """
     Search document chunks using semantic similarity search in Chroma DB.
+    Self-healing: If Chroma DB returns 0 results for document_id, automatically populates Chroma DB
+    from the SQL Chunk database on the fly and retries search.
     
     Args:
         document_id: Unique identifier for the document
         query: Search query/question
-        limit: Maximum number of chunks to return (default: 5)
+        limit: Maximum number of chunks to return (default: 10)
     """
     logger.info(f"Vector search in Chroma DB for doc {document_id}: '{query}'")
     try:
-        from backend.services.vector_storage import get_vector_store
+        from backend.services.vector_storage import get_vector_store, store_chunks_in_vector_db
         vectorstore = get_vector_store()
         
         results = vectorstore.similarity_search(
@@ -88,6 +118,25 @@ def search_chunks_vector_db(document_id: str, query: str, limit: int = 5) -> Lis
             k=limit,
             filter={"document_id": document_id}
         )
+        
+        # Self-healing index recovery if 0 results returned from Chroma
+        if not results:
+            logger.warning(f"Chroma DB returned 0 vector search results for doc {document_id}. Syncing SQL chunks to Chroma DB...")
+            with SessionLocal() as db:
+                sql_chunks = db.execute(
+                    select(Chunk)
+                    .where(Chunk.document_id == document_id)
+                    .order_by(Chunk.sequence_number)
+                ).scalars().all()
+                
+                if sql_chunks:
+                    logger.info(f"Auto-syncing {len(sql_chunks)} SQL chunks to Chroma DB for doc {document_id}...")
+                    store_chunks_in_vector_db(sql_chunks, document_id)
+                    results = vectorstore.similarity_search(
+                        query,
+                        k=limit,
+                        filter={"document_id": document_id}
+                    )
         
         top_chunks = []
         for doc in results:
@@ -101,18 +150,18 @@ def search_chunks_vector_db(document_id: str, query: str, limit: int = 5) -> Lis
             })
         return top_chunks
     except Exception as e:
-        logger.error(f"Vector search failed: {e}", exc_info=True)
+        logger.error(f"Vector search failed for doc {document_id}: {e}", exc_info=True)
         return []
 
 
-def search_chunks_bm25(document_id: str, query: str, limit: int = 5) -> List[Dict[str, Any]]:
+def search_chunks_bm25(document_id: str, query: str, limit: int = 10) -> List[Dict[str, Any]]:
     """
-    Search document chunks in the SQL database using keyword BM25 search.
+    Search document chunks in the SQL database using smart keyword BM25 search + SQL ILIKE fallback.
     
     Args:
         document_id: Unique identifier for the document
         query: Search query/keywords
-        limit: Maximum number of chunks to return (default: 5)
+        limit: Maximum number of chunks to return (default: 10)
     """
     logger.info(f"BM25 search in SQL DB for doc {document_id}: '{query}'")
     try:
@@ -127,11 +176,8 @@ def search_chunks_bm25(document_id: str, query: str, limit: int = 5) -> List[Dic
             if not chunks:
                 return []
                 
-            def tokenize(text: str) -> List[str]:
-                return re.findall(r'\w+', text.lower())
-                
-            corpus = [tokenize(c.content) for c in chunks]
-            tokenized_query = tokenize(query)
+            corpus = [clean_and_stem_tokens(c.content) for c in chunks]
+            tokenized_query = clean_and_stem_tokens(query)
             
             bm25 = SimpleBM25(corpus)
             scores = bm25.get_scores(tokenized_query)
@@ -149,10 +195,79 @@ def search_chunks_bm25(document_id: str, query: str, limit: int = 5) -> List[Dic
                         "page_end": chunks[i].page_end,
                         "score": scores[i],
                     })
+                    
+            # Fallback to SQL ILIKE search if BM25 scores 0 results
+            if not top_chunks and tokenized_query:
+                logger.info(f"BM25 scored 0 results for doc {document_id}. Falling back to SQL ILIKE search...")
+                keywords = [k for k in query.split() if k.lower() not in ENGLISH_STOP_WORDS]
+                if keywords:
+                    first_kw = keywords[0]
+                    ilike_res = db.execute(
+                        select(Chunk)
+                        .where(Chunk.document_id == document_id)
+                        .where(Chunk.content.ilike(f"%{first_kw}%"))
+                        .order_by(Chunk.sequence_number)
+                        .limit(limit)
+                    ).scalars().all()
+                    for c in ilike_res:
+                        top_chunks.append({
+                            "chunk_id": c.chunk_id,
+                            "content": c.content,
+                            "sequence_number": c.sequence_number,
+                            "page_start": c.page_start,
+                            "page_end": c.page_end,
+                            "score": 1.0,
+                        })
+                        
             return top_chunks
     except Exception as e:
         logger.error(f"BM25 search failed: {e}", exc_info=True)
         return []
+
+
+def hybrid_search_chunks(document_id: str, query: str, limit: int = 10) -> List[Dict[str, Any]]:
+    """
+    Perform hybrid retrieval combining vector similarity search and BM25 keyword matching into 1 tool call.
+    Deduplicates results and returns top relevant chunks ordered by sequence number.
+    
+    Args:
+        document_id: Unique identifier for the document
+        query: Search query/question
+        limit: Maximum number of chunks to return (default: 10)
+    """
+    logger.info(f"Hybrid search tool call for doc {document_id}: '{query}'")
+    vector_chunks = search_chunks_vector_db(document_id, query, limit=limit)
+    bm25_chunks = search_chunks_bm25(document_id, query, limit=limit)
+    
+    seen_ids = set()
+    combined_chunks = []
+    
+    for c in vector_chunks + bm25_chunks:
+        cid = c.get("chunk_id") or c.get("sequence_number")
+        if cid and cid not in seen_ids:
+            seen_ids.add(cid)
+            combined_chunks.append(c)
+            
+    combined_chunks.sort(key=lambda x: x.get("sequence_number") or 0)
+    return combined_chunks[:limit]
+
+
+def get_all_document_chunks(document_id: str) -> List[Dict[str, Any]]:
+    """
+    Retrieve all chunks for a document ordered by sequence number.
+    Use this tool when you need to inspect the complete contract or perform full document analysis.
+    
+    Args:
+        document_id: Unique identifier for the document
+    """
+    logger.info(f"Retrieving ALL chunks for doc {document_id}")
+    with SessionLocal() as db:
+        result = db.execute(
+            select(Chunk)
+            .where(Chunk.document_id == document_id)
+            .order_by(Chunk.sequence_number)
+        )
+        return [c.to_dict() for c in result.scalars().all()]
 
 
 def get_chunk_by_sequence(document_id: str, sequence_number: int) -> Dict[str, Any]:
@@ -239,35 +354,30 @@ Your job is to answer questions about a legal document by retrieving the most re
 
 REASONING AND PLANNING PROCESS:
 1. Deconstruct the user's question to identify key concepts, dates, parties, obligations, or definitions.
-2. Use `search_chunks_vector_db` for semantic search (concepts, synonym matching).
-3. Use `search_chunks_bm25` for keyword search (exact names, specific section numbers, abbreviations).
-4. If you find a relevant chunk that refers to a section or contains references like "the foregoing" or "this Section 4", retrieve neighboring chunks using `get_surrounding_chunks` or specific sequence numbers using `get_chunk_by_sequence` to resolve context.
-5. If the document references a defined term, use keyword search to find where it is defined.
-6. Plan your search strategy step-by-step. If your first search yields no results, adjust your query and try again.
-7. Synthesize a complete and accurate answer. Provide citations (chunk_id, page numbers, text snippets) for all claims.
+2. Use `hybrid_search_chunks` as your primary tool to perform combined semantic vector search and smart keyword search in 1 call.
+3. If analyzing full contract structure, broad obligations, or top summary points, use `get_all_document_chunks` to inspect all contract text.
+4. Use `search_chunks_vector_db` or `search_chunks_bm25` for specific targeted follow-up queries.
+5. If you find a relevant chunk that refers to a section or contains references like "the foregoing" or "this Section 4", retrieve neighboring chunks using `get_surrounding_chunks` or specific sequence numbers using `get_chunk_by_sequence` to resolve context.
+6. Plan your search strategy step-by-step. Synthesize a complete and accurate answer. Provide citations (chunk_id, page numbers, text snippets) for all claims.
 
-STRICT GUIDELINES:
+STRICT TRUTHFULNESS & ANTI-HALLUCINATION GUIDELINES:
 - Always use the actual `document_id` UUID provided in the request instructions.
-- Do not invent information or make assumptions. If the document does not contain the answer, state that it is UNKNOWN or unresolved.
+- NEVER invent, extrapolate, hypothesize, or assume information not explicitly stated in the retrieved contract text.
+- IF NO ANSWER IS FOUND or information is not present in the retrieved chunks: STATE THE TRUTH DIRECTLY. Explicitly state in the `answer` field what was searched for and that the information was NOT found in the contract document. Example: "Based on the provided contract document, no information or clause was found regarding [topic]."
+- DO NOT use external general knowledge to answer questions about contract details if those details are not in the document.
+- If only partial information is found, answer ONLY what is supported by retrieved chunks, and list all missing/unverified aspects in `unresolved_parts`.
+- DO NOT leave the `answer` field empty under any circumstances.
 """
 
-def get_ministral_model() -> ChatMistralAI:
-    """Initialize the Ministral model for the retrieval agent."""
-    api_key = settings.MISTRAL_API_KEY or os.environ.get("MISTRAL_API_KEY")
-    if not api_key:
-        raise RuntimeError("MISTRAL_API_KEY is not configured.")
-    return ChatMistralAI(
-        model="ministral-14b-2512",
-        api_key=api_key,
-        temperature=0.0,
-        timeout=settings.MISTRAL_API_TIMEOUT,
-        max_retries=settings.MISTRAL_MAX_RETRIES,
-    )
+def get_ministral_model() -> Any:
+    """Initialize the 14B Ministral model for the QA retrieval agent with exponential backoff retries."""
+    from backend.utils.llm_utils import get_resilient_llm, ORCHESTRATOR_MODEL_NAME
+    return get_resilient_llm(model_name=ORCHESTRATOR_MODEL_NAME, temperature=0.0)
 
 
 def create_retrieval_agent() -> Any:
     """
-    Create the retrieval agent.
+    Create the multi-turn retrieval agent for complex reasoning tasks.
     """
     from deepagents.backends import CompositeBackend, StateBackend, StoreBackend
     
@@ -293,14 +403,124 @@ def create_retrieval_agent() -> Any:
         store=store,
         skills=["backend/skills/document-retrieval"],
         tools=[
+            hybrid_search_chunks,
+            get_all_document_chunks,
             search_chunks_vector_db,
             search_chunks_bm25,
             get_chunk_by_sequence,
             get_surrounding_chunks,
             get_total_chunks_count,
         ],
-        middleware=[
-            CodeInterpreterMiddleware()
-        ],
+        middleware=[],
         response_format=RetrievalAgentResult,
     )
+
+
+def hybrid_retrieve_contract_chunks(document_id: str, query: str, top_k: int = 12) -> List[Dict[str, Any]]:
+    """
+    Perform fast hybrid retrieval combining SQL BM25 keyword matching and Chroma vector similarity search.
+    If total document chunks <= 25, returns ALL document chunks in sequence order for 100% complete context.
+    """
+    total_count = get_total_chunks_count(document_id)
+    
+    # Small to medium contract documents: return full context directly
+    if 0 < total_count <= 25:
+        with SessionLocal() as db:
+            result = db.execute(
+                select(Chunk)
+                .where(Chunk.document_id == document_id)
+                .order_by(Chunk.sequence_number)
+            )
+            return [c.to_dict() for c in result.scalars().all()]
+            
+    # Larger contract documents: perform hybrid retrieval
+    vector_chunks = search_chunks_vector_db(document_id, query, limit=top_k)
+    bm25_chunks = search_chunks_bm25(document_id, query, limit=top_k)
+    
+    seen_ids = set()
+    combined_chunks = []
+    
+    for chunk in vector_chunks + bm25_chunks:
+        cid = chunk.get("chunk_id") or chunk.get("sequence_number")
+        if cid and cid not in seen_ids:
+            seen_ids.add(cid)
+            combined_chunks.append(chunk)
+            
+    combined_chunks.sort(key=lambda c: c.get("sequence_number") or 0)
+    return combined_chunks[:top_k]
+
+
+def run_fast_grounded_qa(document_id: str, question: str) -> Dict[str, Any]:
+    """
+    Execute grounded QA using fast hybrid retrieval in a single pass with Ministral 14B.
+    Falls back to multi-turn agent if initial retrieval yields no results or fails.
+    """
+    chunks = hybrid_retrieve_contract_chunks(document_id, question, top_k=15)
+    
+    if not chunks:
+        agent = create_retrieval_agent()
+        from langchain_core.messages import HumanMessage
+        prompt_msg = f"Please answer the following question about the contract document with ID '{document_id}':\n\n{question}"
+        state = agent.invoke({"messages": [HumanMessage(content=prompt_msg)]})
+        agent_result = state.get("structured_response") or state.get("response")
+        if agent_result and hasattr(agent_result, "model_dump"):
+            return agent_result.model_dump()
+        elif isinstance(agent_result, dict):
+            return agent_result
+        return {
+            "answer": "Based on the provided contract document, no information or text chunks were found for this query.",
+            "citations": [],
+            "unresolved_parts": [question]
+        }
+        
+    context_blocks = []
+    for c in chunks:
+        seq = c.get("sequence_number", "?")
+        page_s = c.get("page_start", "?")
+        page_e = c.get("page_end", page_s)
+        cid = c.get("chunk_id", f"seq_{seq}")
+        content = c.get("content", "")
+        context_blocks.append(
+            f"--- CHUNK (Seq: {seq}, ID: {cid}, Page: {page_s}-{page_e}) ---\n{content}"
+        )
+        
+    formatted_context = "\n\n".join(context_blocks)
+    
+    prompt = f"""You are a strict, grounded legal document QA assistant.
+
+DOCUMENT ID: {document_id}
+
+QUESTION:
+{question}
+
+RETRIEVED CONTRACT CONTEXT:
+{formatted_context}
+
+STRICT INSTRUCTIONS:
+1. Answer the question based ONLY on the retrieved contract text above.
+2. If the text does NOT contain the answer or details requested, state clearly and truthfully: "Based on the provided contract document, no information was found regarding [topic]." Do NOT invent or speculate.
+3. Provide citations referencing the Chunk ID and page numbers for all factual assertions in your answer.
+"""
+
+    llm = get_ministral_model()
+    structured_llm = llm.with_structured_output(RetrievalAgentResult)
+    
+    try:
+        result = structured_llm.invoke(prompt)
+        if hasattr(result, "model_dump"):
+            return result.model_dump()
+        elif isinstance(result, dict):
+            return result
+        return {"answer": str(result), "citations": [], "unresolved_parts": []}
+    except Exception as e:
+        logger.error(f"Single-pass QA failed, falling back to multi-turn agent: {e}", exc_info=True)
+        agent = create_retrieval_agent()
+        from langchain_core.messages import HumanMessage
+        prompt_msg = f"Please answer the following question about the contract document with ID '{document_id}':\n\n{question}"
+        state = agent.invoke({"messages": [HumanMessage(content=prompt_msg)]})
+        agent_result = state.get("structured_response") or state.get("response")
+        if agent_result and hasattr(agent_result, "model_dump"):
+            return agent_result.model_dump()
+        elif isinstance(agent_result, dict):
+            return agent_result
+        return {"answer": f"QA processing error: {e}", "citations": [], "unresolved_parts": [question]}

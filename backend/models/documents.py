@@ -51,6 +51,23 @@ class Document(Base):
         default=datetime.utcnow,
         nullable=False,
     )
+    counterparty_name: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+    company_name: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+    contract_type: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+    )
+    status: Mapped[str] = mapped_column(
+        String(50),
+        default="UPLOADED",
+        nullable=False,
+    )
     
     # Relationship to chunks (using forward reference to avoid circular import)
     chunks: Mapped[list["Chunk"]] = relationship(

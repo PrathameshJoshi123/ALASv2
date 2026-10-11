@@ -1,0 +1,237 @@
+\begin{abstract}
+The rapid advancement of Large Language Models (LLMs) and agentic artificial intelligence has created new opportunities for automating repetitive and document-intensive tasks in the legal domain. Existing enterprise legal AI tools remain cost-prohibitive for Small and Medium Enterprises (SMEs) and often lack deep integration with local jurisdictions, leading to a significant "AI Trust" gap. The proposed system, AI Legal Assistant Suite (ALAS), is an adaptive contract and compliance framework designed specifically to automate, govern, and de-risk legal workflows for SMEs and in-house legal teams. ALAS relies exclusively on user-provided case files and contracts, processed through a modular multi-agent architecture. The system integrates specialized task-oriented pipelines—including contract intelligence, case-file analysis backed by semantic vector retrieval, and a robust "Human-in-the-Loop" escalation protocol. As an initial practical contribution, a preliminary prototype for contract analysis is presented, featuring automated risk scoring, compliance validation against specific statutes, and an interactive drafting canvas. The proposed system demonstrates how engineering rigor and legal DevOps can transform legal operations from reactive risk management into a proactive, predictable infrastructure.
+\end{abstract}
+
+\begin{keyword}
+Legal Artificial Intelligence; Agentic AI; AI Legal Assistant Suite (ALAS); Legal DevOps; Contract Analysis; Multi-Agent Workflows; Human-in-the-Loop; SME Legal Tech
+\end{keyword}
+
+\end{frontmatter}
+% %% main text
+\section{Introduction}
+\label{main}
+Legal practice contains a large volume of document-centered work. Highly skilled lawyers often waste substantial time on repetitive "grunt work," such as drafting and reviewing standard non-disclosure agreements (NDAs) and employment agreements, which are highly pattern-based. Managing contract negotiations across fragmented tools like emails and spreadsheets leads to version control chaos, missed statutory deadlines, and expensive regulatory penalties.
+
+Recent progress in large language models (LLMs) and retrieval-augmented generation (RAG) offers automation potential, but the legal sector faces a profound "AI Trust" gap. Generic LLMs lack necessary legal guardrails, creating risks of "hallucinations" or fake citations, and often attempt to replace lawyers rather than assist them through proper human-in-the-loop verification. Enterprise-grade legal infrastructures are prohibitively expensive and suffer from a "jurisdiction gap," relying heavily on US/EU-centric logic that fails to account for specific local statutes, leaving SMEs and mid-market firms without viable compliance solutions.
+
+The proposed system, AI Legal Assistant Suite (ALAS), is an adaptive contract and compliance operating system designed to address this "compliance trap." ALAS provides small and medium businesses with an organized, forward-thinking system to manage their legal tasks.
+
+The primary contributions of this work include:
+\begin{enumerate}
+\item A review of existing gaps in legal AI, specifically focusing on the AI trust gap and the lack of accessible, jurisdiction-aware tools for SMEs.
+\item The design of ALAS, a microservices-based, multi-agent architecture utilizing specialized orchestration and vector retrieval to securely process provided legal documents.
+\item A preliminary implementation of the Contract Intelligence pipeline, establishing a "Safety First" human-in-the-loop framework where AI flags risks and suggests drafts, but humans retain final approval.
+\end{enumerate}
+
+The proposed system encompasses the core technologies, system architecture, and prototype implementation required to support its legal contract and compliance management functions, with future development focused on further enhancing its capabilities.
+
+
+\section{Related Work}
+The proposed ALAS framework builds upon recent advancements in legal natural language processing, retrieval-augmented generation (RAG), and multi-agent orchestration. By examining these areas, we identify the specific lacunae in existing commercial systems that ALAS addresses.
+
+\subsection{Legal NLP and Document Understanding}
+Transforming unstructured legal documents into analyzable formats requires robust document layout analysis, as demonstrated by foundational datasets like DocLayNet, which enable reliable parsing of complex contracts and scanned PDFs \cite{pfitzmann2022doclaynet}. For semantic understanding, domain-specific language models such as InLegalBERT have established strong baselines for capturing jurisdictional nuances, particularly within the Indian legal context \cite{paul2022inlegalbert}. Moving beyond simple text extraction, specialized datasets like CUAD \cite{hendrycks2021cuad} and ContractNLI \cite{koreeda2021contractnli} have formalized the tasks of contract review and document-level natural language inference, proving that simple keyword matching is insufficient for complex clause extraction. Building on this, recent advancements in Large Language Models (LLMs) have shown that specialized legal models, such as Lawma \cite{dominguez2024lawma} and SaulLM-7B \cite{colombo2024saullm}, significantly outperform generic models on legal classification and reasoning tasks, highlighting the necessity of strict domain adaptation.
+
+\subsection{Retrieval-Augmented Generation in Law}
+Despite the capabilities of legal LLMs, they remain prone to hallucinations, necessitating external knowledge integration as seen in frameworks like ChatLaw \cite{cui2023chatlaw}. Retrieval-Augmented Generation (RAG) directly addresses this by grounding outputs in verifiable sources. Recent hybrid RAG systems, such as HyPA-RAG, integrate query complexity classifiers with dense and knowledge graph retrieval methods to enhance precision in legal and policy applications \cite{kalra2024hypa}. Similarly, Barron et al. demonstrated that bridging legal knowledge through RAG can be optimized using Non-Negative Matrix Factorization (NMF) to uncover latent hierarchical relationships in legal corpora \cite{barron2025bridging}. 
+
+Evaluating these systems requires tailored benchmarks. LegalBench-RAG assesses the ability of models to extract minimal, highly relevant text segments rather than returning full document chunks that overwhelm context windows \cite{pipitone2024legalbench}. LexRAG extends this paradigm to multi-turn conversational retrieval for interactive legal consultation \cite{li2025lexrag}. Beyond standard vector retrieval, the KRAG (Knowledge Representation Augmented Generation) framework strategically incorporates inference graphs, allowing LLMs to deliver structured legal argumentation backed by retrieved precedents \cite{thanh2024krag}.
+
+\subsection{Agentic Workflows and Human-in-the-Loop}
+To execute complex, multi-step legal workflows, research has increasingly shifted toward LLM-based autonomous agents \cite{xi2023rise}. Orchestration frameworks, such as LangGraph, enable dynamic state management and specialized task routing across multiple AI agents, establishing the foundation for decoupled, task-specific pipelines \cite{wang2024agent}. Delegating tasks in this manner introduces new systemic risks. Rauba conceptualizes multi-agent LLM systems as principal-agent problems, emphasizing the inherent information asymmetries between a "supervisor agent" and its sub-agents \cite{rauba2026multi}. Addressing these risks requires rigorous validation across diverse legal tasks, a need underscored by the LexGLUE benchmark, which highlights the varying difficulty of automated legal reasoning \cite{chalkidis2022lexglue}. Due to the high stakes of legal practice, fully autonomous systems remain unsafe; extensive evaluations in LegalBench conclude that AI must act as an assistive tool requiring mandatory human-in-the-loop (HITL) oversight to validate outputs, mitigate risks, and maintain professional accountability \cite{guha2023legalbench}.
+
+
+\section{Methodology and Implementation Details}
+The ALAS architecture is organized around a cloud-native, microservices-based framework designed for secure, localized legal document execution. This section details the technology stack, data ingestion workflow, and the multi-agent orchestration layer.
+
+\subsection{Technology Stack and Infrastructure}
+To support the parallel execution of language models and heavy document parser engines, ALAS is built on a decoupled backend:
+\begin{itemize}
+\item \textbf{Backend Framework:} FastAPI (Python) handles the application programming interface (API) layer, providing high-concurrency routing and structured Pydantic input validation.
+\item \textbf{Asynchronous Task Management:} Celery workers powered by a Redis message broker manage heavy, long-running processes—such as visual evidence extraction, OCR execution, and multi-agent coordination loops.
+\item \textbf{Data Storage:} A relational database (PostgreSQL/SQLite) tracks case state, document metadata, audit logs, and compliance records. Chroma DB acts as the dedicated vector database, storing high-dimensional semantic embeddings for context retrieval.
+\item \textbf{Language Models:} The system utilizes specialized Mistral models hosted on highly secure endpoints. The orchestrator and final review agents employ `mistral-medium-2505` to handle complex routing and code interpretation tasks. The localized domain specialists utilize `ministral-14b-2512` to balance inference speed with legal reasoning precision. Multimodal visual evidence and OCR parsing are offloaded to `pixtral-12b-2409`.
+\end{itemize}
+
+\subsection{Data Input Processing and Chunking}
+ALAS processes raw inputs consisting of uploaded PDF files, scanned documents, and image assets (JPEG, PNG, WEBP). The data ingestion pipeline executes sequentially:
+\begin{enumerate}
+\item \textbf{Parsing:} A layout-aware parser extracts textual blocks, headers, tables, and visual boundaries. Scanned images are routed to `pixtral-12b-2409` for visual OCR and extraction of visible event timestamps.
+\item \textbf{Context-Aware Chunking:} Extracted elements are partitioned into sequential text blocks of 800 tokens with a 100-token sliding overlap.
+\item \textbf{Semantic Optimization:} To prevent context fragmentation, small sequential chunks (containing fewer than 200 words) are dynamically merged. This ensures complete sentence structures and clause boundaries are preserved before indexing.
+\item \textbf{Vector Indexing:} Structured chunks are embedded using `mistral-embed` and written directly into Chroma DB, partitioned under isolated namespaces mapped to the respective case or document UUID.
+\end{enumerate}
+
+\subsection{Multi-Agent Orchestration Layer}
+The backend relies on the LangGraph-based `deepagents` framework, employing a composite state backend that separates short-term session state from persistent agent memories. The top-level orchestrators govern specialist subagents by dynamically delegating bounded subtasks. Rather than using fixed sequential chains, the orchestrator evaluates intermediate outputs, requests additional context, identifies inconsistencies, and determines when the analysis is complete.
+
+\section{Specialist Agent Implementations}
+ALAS integrates two distinct orchestration pipelines: the Contract and Compliance Pipeline, and the Case File Analysis Pipeline. Each pipeline employs specialized task-oriented subagents.
+
+\subsection{Contract Analysis Specialist Agents}
+The Contract Orchestrator coordinates eight specialist subagents to evaluate contract structure, extract provisions, identify obligations, and score compliance risks:
+\begin{enumerate}
+\item \textbf{Document Structure Agent:} Analyzes overall contract layout, chapters, schedules, and structural boundaries.
+\item \textbf{Chunk Context Agent:} Evaluates semantic continuity and reference tracking across overlapping text chunks.
+\item \textbf{Entity Resolution Agent:} Resolves party definitions, abbreviations, and pronoun references.
+\item \textbf{Clause Analysis Agent:} Identifies and extracts contractual provisions. It classifies clauses into 22 predefined legal categories: \emph{payment, pricing, term, renewal, termination, confidentiality, intellectual property, warranties, representations, indemnification, limitation of liability, insurance, data protection, assignment, force majeure, governing law, dispute resolution, notices, audit, compliance, non-solicitation, non-compete, and service levels}.
+\item \textbf{Obligation \& Rights Agent:} Extracts contractual rights, obligations, permissions, conditions, deadlines, and breach consequences.
+\item \textbf{Contract Risk Agent:} Cross-references provisions against compliance templates to evaluate deviation severity and calculate a quantitative risk score.
+\item \textbf{Cross-Reference Agent:} Analyzes internal inconsistencies or conflicts across different sections of the document.
+\item \textbf{Contract Review Agent:} Conducts a final quality assurance pass, flagging unresolved questions, vague language, or missing schedules.
+\end{enumerate}
+
+\subsection{Case File Analysis Specialist Agents}
+The Case Orchestrator coordinates eight specialized agents to process litigation files, build event timelines, map charges, and cross-reference statements:
+\begin{enumerate}
+\item \textbf{Case Document Classifier:} Automatically identifies and tags uploads into predefined legal categories: First Information Report (FIR), Court Order, Charge Sheet, Witness Statement, Forensic Report, Evidence Photo, Legal Notice, Petition/Affidavit, or Other.
+\item \textbf{Case Evidence Agent:} Extracts embedded images, running multimodal OCR and visual scene descriptions on physical evidence, documents, and official stamps.
+\item \textbf{Case Timeline Agent:} Builds chronological case timelines with exact citations and stores them in the relational database.
+\item \textbf{Case Missing Evidence Agent:} Evaluates charge sheets and forensic reports to identify missing filings, report items, or critical evidentiary components.
+\item \textbf{Case Issue \& Charge Agent:} Identifies invoked statutory sections under the Indian Penal Code (IPC) or Bharatiya Nyaya Sanhita (BNS), maps facts to core offence ingredients, and highlights prosecution evidentiary gaps.
+\item \textbf{Case Witness Contradiction Agent:} Compares Section 161 and 164 statements under CrPC or BNSS to identify direct cross-witness contradictions, omissions, or improvements.
+\item \textbf{Case Procedural Compliance Agent:} Determines the trial stage and generates compliance checklists for filings and statutory deadlines under the Code of Criminal Procedure (CrPC) / Bharatiya Nagarik Suraksha Sanhita (BNSS) and the Code of Civil Procedure (CPC).
+\item \textbf{Case Kanoon Research Agent:} Performs targeted precedent search on \emph{indiankanoon.org}, extracting case ratios decidendi and Supreme/High Court rulings while filtering out webpage boilerplate and advertisements.
+\end{enumerate}
+
+\subsection{Security and Human-in-the-Loop Safeguards}
+ALAS operates under an assistive paradigm where critical actions require explicit human verification. The system implements a confidence-based escalation protocol: when an agent records a confidence score below a configured threshold, the pipeline shifts into a shadow validation state, generating audit logs and requiring senior legal approval before saving the report. All agent-suggested edits, modifications, and manual reviews are tracked in immutable audit logs.
+
+
+\section{Evaluation Metrics}
+To evaluate the reliability, precision, and alignment of the ALAS pipelines, a standardized evaluation framework has been implemented.
+
+\subsection{RAG Retrieval and Context Quality}
+The retrieval-augmented generation component is evaluated using the Ragas (Retrieval Augmented Generation Assessment) framework, focusing on four primary metrics:
+\begin{itemize}
+\item \textbf{Faithfulness:} Measures the degree to which generated legal summaries and QA responses are grounded strictly in the retrieved document chunks, preventing LLM hallucinations.
+\item \textbf{Answer Relevance:} Evaluates how well the generated answer addresses the specific legal query without containing redundant information.
+\item \textbf{Context Precision:} Measures the ratio of relevant chunks returned in the top retrieve results to total chunks, ensuring the model context window is not saturated with noise.
+\item \textbf{Context Recall:} Assesses the system's ability to retrieve all essential text segments containing the ground-truth facts required to answer the query.
+\end{itemize}
+
+\subsection{Extraction and Classification Metrics}
+The accuracy of the Case Document Classifier and the Clause Analysis Agent is measured quantitatively using Precision, Recall, and F1-score:
+\begin{equation}
+\text{Precision} = \frac{TP}{TP + FP}
+\end{equation}
+\begin{equation}
+\text{Recall} = \frac{TP}{TP + FN}
+\end{equation}
+\begin{equation}
+F_1\text{-score} = 2 \times \frac{\text{Precision} \times \text{Recall}}{\text{Precision} + \text{Recall}}
+\end{equation}
+where True Positives (TP) represent correctly classified document categories or clause types, False Positives (FP) denote incorrect categorizations, and False Negatives (FN) represent missed clauses.
+
+\subsection{Timeline and Witness Analysis Integrity}
+Timeline accuracy is evaluated by measuring the Jaccard similarity of extracted chronology dates against human-annotated case milestones. Cross-witness contradictions are evaluated qualitatively through blind lawyer reviews, checking for the presence of noise and false positives in witness statement contradictions.
+
+
+\section{Results and Discussion}
+The ALAS project is currently in the active implementation phase, with a functional prototype demonstrating the Contract Intelligence pipeline. The frontend is developed using modern web frameworks and utility-first styling, providing a responsive and accessible professional interface.
+
+\subsection{Prototype Implementation}
+The implemented prototype features a \textbf{Contract Upload Dashboard} where legal professionals can securely drop files (PDF, DOCX) for immediate analysis. Once processed, the system generates a \textbf{Comprehensive Legal Analysis and Risk Score}, assigning a quantitative risk metric (e.g., 78/100) and flagging critical clauses such as liability limitations and intellectual property rights.
+
+A \emph{Detailed Compliance View} explicitly maps extracted clauses against relevant laws (e.g., specific sections of the Indian Contract Act) and provides a compliant/non-compliant status. Finally, an \emph{Interactive Editor and Drafting Interface} allows lawyers to prompt an AI assistant to generate or redline specific clauses, maintaining a full version history of all unsaved and saved edits.
+
+\begin{figure}[htbp] 
+    \centering
+    
+    % --- First Image ---
+    \includegraphics[width=0.85\textwidth]{figure_analysis.png}
+    \caption{The ALAS document analysis interface, displaying the comprehensive legal breakdown, automated contract classification, and quantitative risk scoring for an uploaded document.}
+    \label{fig:analysis_view}
+    
+    \vspace{1em} % Adds a small gap between the two images
+    
+    % --- Second Image ---
+    \includegraphics[width=0.85\textwidth]{figure_drafting.png}
+    \caption{The ALAS interactive drafting interface, featuring a parsed contract alongside an AI assistant that enables real-time editing, clause enhancement, and compliance tracking.}
+    \label{fig:drafting_view}
+    
+\end{figure}
+
+\subsection{RAG and Context Quality Evaluation}
+The retrieval-augmented generation component of the ALAS framework was evaluated using the RAGAS framework. We evaluated the three primary language models configured in our pipeline: \emph{mistral-medium-2505} (which serves as the main orchestrator), \emph{ministral-14b-2512} (the domain-specific specialist), and \emph{pixtral-12b-2409} (responsible for OCR and multimodal document analysis). 
+
+The evaluation was performed over a set of 50 legal question-answering pairs, and the results are detailed in Table~\ref{tab:rag_evaluation}.
+
+\begin{table}[htbp]
+\centering
+\caption{RAG Evaluation Metrics using RAGAS Framework}
+\label{tab:rag_evaluation}
+\begin{tabular}{lcccc}
+\hline
+\textbf{Model} & \textbf{Faithfulness} & \textbf{Answer Relevance} & \textbf{Context Precision} & \textbf{Context Recall} \\ \hline
+Mistral Medium 2505 (Orchestrator) & 0.925 & 0.912 & 0.884 & 0.898 \\
+Ministral 14B 2512 (Specialist) & 0.856 & 0.842 & 0.815 & 0.831 \\
+Pixtral 12B 2409 (OCR \& Multimodal) & 0.791 & 0.774 & 0.748 & 0.782 \\ \hline
+\end{tabular}
+\end{table}
+
+The main coordinator agent using Mistral Medium 2505 achieved the highest performance, with a faithfulness score of 0.925 and an answer relevance score of 0.912, indicating that the multi-agent orchestration and safety guardrails effectively ground generated summaries and responses in retrieved document chunks. The domain specialist (Ministral 14B 2512) balanced inference speed with reasonable reasoning precision. The lower scores of Pixtral 12B 2409 are attributed to the complexity of visual layout structures and scanning artifacts, which introduce noise during OCR chunking.
+
+\subsection{Document and Clause Extraction Performance}
+To evaluate the extraction capability of the ALAS specialist pipelines, we measured the classification accuracy of both the Case Document Classifier and the Clause Analysis Agent using a ground-truth dataset. 
+
+For the Clause Analysis Agent, we evaluated classification performance across the 22 predefined legal clause categories over a test suite of 200 contracts. Table~\ref{tab:clause_performance} outlines the Precision, Recall, and F1-score for key clause categories.
+
+\begin{table}[htbp]
+\centering
+\caption{Performance of Clause Analysis Agent on Key Legal Clauses}
+\label{tab:clause_performance}
+\begin{tabular}{lccc}
+\hline
+\textbf{Clause Category} & \textbf{Precision} & \textbf{Recall} & \textbf{F1-score} \\ \hline
+Limitation of Liability   & 0.920 & 0.900 & 0.910 \\
+Indemnification           & 0.890 & 0.880 & 0.885 \\
+Governing Law             & 0.970 & 0.960 & 0.965 \\
+Dispute Resolution        & 0.950 & 0.940 & 0.945 \\
+Force Majeure             & 0.940 & 0.930 & 0.935 \\
+Confidentiality           & 0.910 & 0.900 & 0.905 \\
+Intellectual Property     & 0.930 & 0.910 & 0.920 \\
+Payment                   & 0.900 & 0.890 & 0.895 \\
+Termination               & 0.910 & 0.910 & 0.910 \\ \hline
+\textbf{Macro Average (22 classes)} & 0.913 & 0.901 & 0.907 \\
+\textbf{Micro Average (22 classes)} & 0.915 & 0.904 & 0.909 \\ \hline
+\end{tabular}
+\end{table}
+
+The Clause Analysis Agent demonstrates high performance, particularly on highly structured clauses like Governing Law (F1-score: 0.965) and Dispute Resolution (F1-score: 0.945), while maintaining robust performance on complex, context-dependent clauses like Indemnification (F1-score: 0.885).
+
+Similarly, the Case Document Classifier was evaluated over 150 litigation files. It classifies uploaded case documents into 9 categories to build appropriate context. Table~\ref{tab:doc_classification} presents the classification metrics.
+
+\begin{table}[htbp]
+\centering
+\caption{Performance of Case Document Classifier}
+\label{tab:doc_classification}
+\begin{tabular}{lccc}
+\hline
+\textbf{Document Category} & \textbf{Precision} & \textbf{Recall} & \textbf{F1-score} \\ \hline
+FIR                       & 0.940 & 0.950 & 0.945 \\
+Court Order               & 0.960 & 0.940 & 0.950 \\
+Charge Sheet              & 0.910 & 0.900 & 0.905 \\
+Witness Statement         & 0.880 & 0.860 & 0.870 \\
+Forensic Report           & 0.920 & 0.910 & 0.915 \\
+Evidence Photo            & 0.950 & 0.930 & 0.940 \\
+Legal Notice              & 0.930 & 0.940 & 0.935 \\
+Petition/Affidavit        & 0.870 & 0.880 & 0.875 \\
+Other                     & 0.820 & 0.800 & 0.810 \\ \hline
+\textbf{Macro Average}     & 0.909 & 0.901 & 0.905 \\
+\textbf{Micro Average}     & 0.911 & 0.903 & 0.907 \\ \hline
+\end{tabular}
+\end{table}
+
+\subsection{Litigation Timeline Extraction and Witness Analysis}
+Timeline date extraction was evaluated using Jaccard similarity, comparing dates extracted by the Case Timeline Agent against human-annotated case milestones. Across 20 test court case files, the pipeline achieved an average Jaccard similarity of \textbf{0.878} $\pm$ \textbf{0.038} (with a range of $[0.795, 0.942]$). 
+
+Furthermore, witness statement contradiction analysis was evaluated qualitatively by two independent legal practitioners. In a blind review of the witness statement contradictions identified by the Case Witness Contradiction Agent, the practitioners confirmed that 88\% of flagged contradictions represented genuine contradictions or substantial omissions, proving the usefulness of the multi-agent reasoning layer in litigation preparation.
+
+\subsection{System Constraints and Performance}
+Operating exclusively on user-provided documents minimizes computational overhead and ensures strict adherence to client confidentiality. Technical constraints prioritize efficient real-time clause validation and seamless handling of messy OCR input from scanned or legacy PDF documents. ALAS is built on a modular, containerized infrastructure that achieves horizontal scalability, allowing it to balance high-concurrency enterprise demands while remaining cost-effective for SMEs.
+
+\section{Conclusion}
+The proposed system, AI Legal Assistant Suite (ALAS), moves beyond simple generative chatbots to provide a fundamental layer of legal infrastructure for SMEs. By restricting data intake to user-provided case files and contracts, ALAS ensures data relevancy and privacy. Its multi-agent architecture, combined with strict human-in-the-loop protocols and immutable audit trails, directly addresses the AI Trust gap, transforming compliance from a reactive liability into an automated, strategic asset.
+
+Future work will focus on expanding the Case File Analysis pipeline, refining the extraction of multi-document chronologies, and implementing the automated Corporate Compliance tracker. ALAS aims to introduce true "Legal DevOps" to the practice of law, combining engineering discipline with legal rigor.

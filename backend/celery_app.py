@@ -46,6 +46,12 @@ def create_celery_app() -> Celery:
         # Import settings
         imports=(
             "backend.tasks",
+            "backend.tasks.case_tasks",
+            "backend.tasks.pdf_tasks",
+            "backend.tasks.drafting_tasks",
+            "backend.tasks.chunking_tasks",
+            "backend.tasks.context_tasks",
+            "backend.tasks.entity_mention_tasks",
         ),
         
         # Schedule settings

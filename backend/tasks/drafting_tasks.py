@@ -8,6 +8,7 @@ from backend.celery_app import celery_app
 from celery.utils.log import get_task_logger
 
 from langchain_core.messages import HumanMessage
+from backend.utils.llm_utils import execute_with_exponential_backoff
 from backend.database import SessionLocal
 from backend.models.documents import Document
 from backend.services.chunking.database import Chunk
@@ -54,36 +55,39 @@ def run_agent_drafting_task(
                 select(func.count(Chunk.chunk_id)).where(Chunk.document_id == document_id)
             ).scalar() or 0
             
-        # 2. Trigger auto-processing if chunks are 0
+        # 2. Trigger auto-processing if chunks are 0 and template file exists
         if chunks_count == 0:
-            if not auto_chunk:
-                error_msg = f"Chunks count is 0 for template {document_id} and auto_chunk is disabled."
-                logger.error(error_msg)
-                return {"status": "error", "error": error_msg}
+            if file_path and Path(file_path).exists():
+                if not auto_chunk:
+                    error_msg = f"Chunks count is 0 for template {document_id} and auto_chunk is disabled."
+                    logger.error(error_msg)
+                    return {"status": "error", "error": error_msg}
+                    
+                logger.info(f"Chunks count is 0 for template {document_id}. Triggering PDF processing and chunking first...")
                 
-            logger.info(f"Chunks count is 0 for template {document_id}. Triggering PDF processing and chunking first...")
-            
-            from backend.tasks.pdf_tasks import process_pdf_task
-            from backend.tasks.chunking_tasks import chunk_document_task
-            
-            # Step A: Process PDF
-            pdf_result = process_pdf_task(document_id, file_path, filename)
-            if pdf_result.get("status") != "success":
-                return {
-                    "status": "error",
-                    "error": f"Failed to process template PDF: {pdf_result.get('error')}"
-                }
+                from backend.tasks.pdf_tasks import process_pdf_task
+                from backend.tasks.chunking_tasks import chunk_document_task
                 
-            # Step B: Chunk the elements
-            elements = pdf_result.get("elements", [])
-            chunk_result = chunk_document_task(document_id, elements, filename)
-            if chunk_result.get("status") != "success":
-                return {
-                    "status": "error",
-                    "error": f"Failed to chunk template elements: {chunk_result.get('error')}"
-                }
-            
-            logger.info(f"Successfully processed and chunked template contract {document_id} on the fly.")
+                # Step A: Process PDF
+                pdf_result = process_pdf_task(document_id, file_path, filename)
+                if pdf_result.get("status") != "success":
+                    return {
+                        "status": "error",
+                        "error": f"Failed to process template PDF: {pdf_result.get('error')}"
+                    }
+                    
+                # Step B: Chunk the elements
+                elements = pdf_result.get("elements", [])
+                chunk_result = chunk_document_task(document_id, elements, filename)
+                if chunk_result.get("status") != "success":
+                    return {
+                        "status": "error",
+                        "error": f"Failed to chunk template elements: {chunk_result.get('error')}"
+                    }
+                
+                logger.info(f"Successfully processed and chunked template contract {document_id} on the fly.")
+            else:
+                logger.info(f"No physical template file on disk for document {document_id}. Proceeding directly with prompt-only contract drafting.")
 
         # 3. Instantiate and run the drafting orchestrator
         from backend.agents.contract_drafting_orchestrator import create_contract_drafting_orchestrator
@@ -113,52 +117,56 @@ def run_agent_drafting_task(
             log_write(f">>> Log file: {log_file_path}")
             log_write("="*80 + "\n")
             
-            # Stream updates from the coordinator and all subgraphs
-            for chunk in orchestrator.stream(
-                {"messages": [HumanMessage(content=agent_msg)]},
-                stream_mode="updates",
-                subgraphs=True,
-                version="v2",
-            ):
-                if not isinstance(chunk, dict) or "type" not in chunk:
-                    continue
-                    
-                if chunk["type"] == "updates":
-                    ns = chunk.get("ns", [])
-                    data = chunk.get("data", {})
-                    
-                    if ns:
-                        path_str = " -> ".join(ns)
-                        log_write(f"\n[Subagent: {path_str}] running node...")
-                        for node_name, node_data in data.items():
-                            log_write(f"  └─ Step: {node_name}")
-                            if isinstance(node_data, dict) and "messages" in node_data:
-                                for msg in node_data["messages"]:
-                                    if hasattr(msg, "tool_calls") and msg.tool_calls:
-                                        for tc in msg.tool_calls:
-                                            log_write(f"     └─ Tool Call: {tc.get('name')}")
-                                            log_write(f"        Arguments: {json.dumps(tc.get('args'))}")
-                                    elif msg.type == "tool":
-                                        log_write(f"     └─ Tool '{msg.name}' Response snippet: {str(msg.content)[:300]}...")
-                                    elif msg.type == "ai" and msg.content:
-                                        log_write(f"     └─ AI Response snippet: {str(msg.content)[:200]}...")
-                    else:
-                        log_write("\n[Main Drafting Coordinator Agent] running node...")
-                        for node_name, node_data in data.items():
-                            log_write(f"  └─ Step: {node_name}")
-                            
-                            # Extract structured response from coordinator
-                            if isinstance(node_data, dict):
-                                if "structured_response" in node_data and node_data["structured_response"] is not None:
-                                    agent_drafting_result = node_data["structured_response"]
-                                elif "response" in node_data and node_data["response"] is not None:
-                                    agent_drafting_result = node_data["response"]
-                                    
-                            if node_name == "tools" and isinstance(node_data, dict) and "messages" in node_data:
-                                for msg in node_data["messages"]:
-                                    if msg.type == "tool" and msg.name == "task":
-                                        log_write(f"\n>>> Subagent execution completed: {msg.name}")
-                                        log_write(f"    Result snippet: {str(msg.content)[:300]}...")
+            # Stream updates from the coordinator and all subgraphs with exponential backoff retry
+            def run_stream_drafting():
+                nonlocal agent_drafting_result
+                for chunk in orchestrator.stream(
+                    {"messages": [HumanMessage(content=agent_msg)]},
+                    stream_mode="updates",
+                    subgraphs=True,
+                    version="v2",
+                ):
+                    if not isinstance(chunk, dict) or "type" not in chunk:
+                        continue
+                        
+                    if chunk["type"] == "updates":
+                        ns = chunk.get("ns", [])
+                        data = chunk.get("data", {})
+                        
+                        if ns:
+                            path_str = " -> ".join(ns)
+                            log_write(f"\n[Subagent: {path_str}] running node...")
+                            for node_name, node_data in data.items():
+                                log_write(f"  └─ Step: {node_name}")
+                                if isinstance(node_data, dict) and "messages" in node_data:
+                                    for msg in node_data["messages"]:
+                                        if hasattr(msg, "tool_calls") and msg.tool_calls:
+                                            for tc in msg.tool_calls:
+                                                log_write(f"     └─ Tool Call: {tc.get('name')}")
+                                                log_write(f"        Arguments: {json.dumps(tc.get('args'))}")
+                                        elif msg.type == "tool":
+                                            log_write(f"     └─ Tool '{msg.name}' Response snippet: {str(msg.content)[:300]}...")
+                                        elif msg.type == "ai" and msg.content:
+                                            log_write(f"     └─ AI Response snippet: {str(msg.content)[:200]}...")
+                        else:
+                            log_write("\n[Main Drafting Coordinator Agent] running node...")
+                            for node_name, node_data in data.items():
+                                log_write(f"  └─ Step: {node_name}")
+                                
+                                # Extract structured response from coordinator
+                                if isinstance(node_data, dict):
+                                    if "structured_response" in node_data and node_data["structured_response"] is not None:
+                                        agent_drafting_result = node_data["structured_response"]
+                                    elif "response" in node_data and node_data["response"] is not None:
+                                        agent_drafting_result = node_data["response"]
+                                        
+                                if node_name == "tools" and isinstance(node_data, dict) and "messages" in node_data:
+                                    for msg in node_data["messages"]:
+                                        if msg.type == "tool" and msg.name == "task":
+                                            log_write(f"\n>>> Subagent execution completed: {msg.name}")
+                                            log_write(f"    Result snippet: {str(msg.content)[:300]}...")
+
+            execute_with_exponential_backoff(run_stream_drafting)
                                         
             log_write("\n" + "="*80)
             log_write(">>> DEEP AGENT CONTRACT DRAFTING COMPLETE")
@@ -280,52 +288,56 @@ def run_agent_reiteration_task(
             log_write(f">>> Log file: {log_file_path}")
             log_write("="*80 + "\n")
             
-            # Stream updates from the coordinator and all subgraphs
-            for chunk in orchestrator.stream(
-                {"messages": [HumanMessage(content=agent_msg)]},
-                stream_mode="updates",
-                subgraphs=True,
-                version="v2",
-            ):
-                if not isinstance(chunk, dict) or "type" not in chunk:
-                    continue
-                    
-                if chunk["type"] == "updates":
-                    ns = chunk.get("ns", [])
-                    data = chunk.get("data", {})
-                    
-                    if ns:
-                        path_str = " -> ".join(ns)
-                        log_write(f"\n[Subagent: {path_str}] running node...")
-                        for node_name, node_data in data.items():
-                            log_write(f"  └─ Step: {node_name}")
-                            if isinstance(node_data, dict) and "messages" in node_data:
-                                for msg in node_data["messages"]:
-                                    if hasattr(msg, "tool_calls") and msg.tool_calls:
-                                        for tc in msg.tool_calls:
-                                            log_write(f"     └─ Tool Call: {tc.get('name')}")
-                                            log_write(f"        Arguments: {json.dumps(tc.get('args'))}")
-                                    elif msg.type == "tool":
-                                        log_write(f"     └─ Tool '{msg.name}' Response snippet: {str(msg.content)[:300]}...")
-                                    elif msg.type == "ai" and msg.content:
-                                        log_write(f"     └─ AI Response snippet: {str(msg.content)[:200]}...")
-                    else:
-                        log_write("\n[Main Drafting Coordinator Agent] running node...")
-                        for node_name, node_data in data.items():
-                            log_write(f"  └─ Step: {node_name}")
-                            
-                            # Extract structured response from coordinator
-                            if isinstance(node_data, dict):
-                                if "structured_response" in node_data and node_data["structured_response"] is not None:
-                                    agent_drafting_result = node_data["structured_response"]
-                                elif "response" in node_data and node_data["response"] is not None:
-                                    agent_drafting_result = node_data["response"]
-                                    
-                            if node_name == "tools" and isinstance(node_data, dict) and "messages" in node_data:
-                                for msg in node_data["messages"]:
-                                    if msg.type == "tool" and msg.name == "task":
-                                        log_write(f"\n>>> Subagent execution completed: {msg.name}")
-                                        log_write(f"    Result snippet: {str(msg.content)[:300]}...")
+            # Stream updates from the coordinator and all subgraphs with exponential backoff retry
+            def run_stream_reiterate():
+                nonlocal agent_drafting_result
+                for chunk in orchestrator.stream(
+                    {"messages": [HumanMessage(content=agent_msg)]},
+                    stream_mode="updates",
+                    subgraphs=True,
+                    version="v2",
+                ):
+                    if not isinstance(chunk, dict) or "type" not in chunk:
+                        continue
+                        
+                    if chunk["type"] == "updates":
+                        ns = chunk.get("ns", [])
+                        data = chunk.get("data", {})
+                        
+                        if ns:
+                            path_str = " -> ".join(ns)
+                            log_write(f"\n[Subagent: {path_str}] running node...")
+                            for node_name, node_data in data.items():
+                                log_write(f"  └─ Step: {node_name}")
+                                if isinstance(node_data, dict) and "messages" in node_data:
+                                    for msg in node_data["messages"]:
+                                        if hasattr(msg, "tool_calls") and msg.tool_calls:
+                                            for tc in msg.tool_calls:
+                                                log_write(f"     └─ Tool Call: {tc.get('name')}")
+                                                log_write(f"        Arguments: {json.dumps(tc.get('args'))}")
+                                        elif msg.type == "tool":
+                                            log_write(f"     └─ Tool '{msg.name}' Response snippet: {str(msg.content)[:300]}...")
+                                        elif msg.type == "ai" and msg.content:
+                                            log_write(f"     └─ AI Response snippet: {str(msg.content)[:200]}...")
+                        else:
+                            log_write("\n[Main Drafting Coordinator Agent] running node...")
+                            for node_name, node_data in data.items():
+                                log_write(f"  └─ Step: {node_name}")
+                                
+                                # Extract structured response from coordinator
+                                if isinstance(node_data, dict):
+                                    if "structured_response" in node_data and node_data["structured_response"] is not None:
+                                        agent_drafting_result = node_data["structured_response"]
+                                    elif "response" in node_data and node_data["response"] is not None:
+                                        agent_drafting_result = node_data["response"]
+                                        
+                                if node_name == "tools" and isinstance(node_data, dict) and "messages" in node_data:
+                                    for msg in node_data["messages"]:
+                                        if msg.type == "tool" and msg.name == "task":
+                                            log_write(f"\n>>> Subagent execution completed: {msg.name}")
+                                            log_write(f"    Result snippet: {str(msg.content)[:300]}...")
+
+            execute_with_exponential_backoff(run_stream_reiterate)
                                         
             log_write("\n" + "="*80)
             log_write(">>> DEEP AGENT CONTRACT REITERATION COMPLETE")
