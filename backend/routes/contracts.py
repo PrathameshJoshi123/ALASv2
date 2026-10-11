@@ -242,6 +242,10 @@ def analyze_contract_agent(
     try:
         logger.info(f"Submitting agent-only analysis task for document: {document_id}")
         
+        # Reset document status to PROCESSING so UI and polling reflect active work
+        document.status = "PROCESSING"
+        db.commit()
+
         # Import task locally to avoid circular dependencies
         from backend.tasks.pdf_tasks import run_agent_analysis_task
         
@@ -811,3 +815,60 @@ def reiterate_contract_endpoint(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to queue contract reiteration: {e}",
         )
+
+
+@router.get(
+    "/{document_id}/logs",
+    summary="Retrieve live contract analysis agent execution logs",
+    description="Fetch real-time agent thinking steps, LangGraph node progress, and Indian Kanoon tool calls.",
+)
+def get_contract_agent_logs(
+    document_id: str,
+    db: Session = Depends(get_db),
+) -> dict:
+    """
+    Fetch all persistent agent thinking steps, tool calls, and LangGraph node transitions
+    for a contract analysis task directly from the storage log file.
+    """
+    from pathlib import Path
+    log_file_path = Path("backend/storage/logs") / f"{document_id}_agent_execution.log"
+    all_logs = []
+    is_complete = False
+    
+    if log_file_path.exists():
+        try:
+            with open(log_file_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+                for line in lines:
+                    line_str = line.strip()
+                    if not line_str or line_str.startswith("="):
+                        continue
+                    
+                    if "CONTRACT ANALYSIS COMPLETE" in line_str:
+                        is_complete = True
+                    
+                    log_type = "info"
+                    if "Tool Call:" in line_str or "Tool '" in line_str or "Autonomous Tool Call:" in line_str:
+                        log_type = "tool_call"
+                    elif "Step:" in line_str or "running node" in line_str or "LangGraph Engine" in line_str:
+                        log_type = "node"
+                    elif "AI Response" in line_str or "Finding" in line_str:
+                        log_type = "finding"
+                    elif "Indian Kanoon" in line_str:
+                        log_type = "kanoon"
+
+                    all_logs.append({
+                        "agent_name": "ContractLangGraphOrchestrator",
+                        "type": log_type,
+                        "detail": line_str,
+                    })
+        except Exception as e:
+            logger.warning(f"Error reading contract log file {log_file_path}: {e}")
+
+    return {
+        "document_id": document_id,
+        "is_complete": is_complete,
+        "total_logs": len(all_logs),
+        "logs": all_logs,
+    }
+

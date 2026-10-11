@@ -64,6 +64,7 @@ def create_tables_if_not_exist() -> bool:
             ("low_issues", "INTEGER DEFAULT 0"),
             ("recommended_actions", f"{json_type} DEFAULT {json_default}"),
             ("clauses", f"{json_type} DEFAULT {json_default}"),
+            ("legal_sources", f"{json_type} DEFAULT {json_default}"),
         ]
         with engine.begin() as conn:
             for col_name, col_def in new_cols:

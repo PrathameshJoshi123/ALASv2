@@ -14,6 +14,7 @@ type AnalysisPayload = {
   unresolved_questions: string[];
   obligations: any[];
   risks: any[];
+  legal_sources?: any[];
   clauses: any[];
   analysis_markdown?: string;
   source?: string;
@@ -121,6 +122,11 @@ class APIClient {
         : Array.isArray(raw?.risks)
           ? raw.risks
           : [],
+      legal_sources: Array.isArray(data?.legal_sources)
+        ? data.legal_sources
+        : Array.isArray(raw?.legal_sources)
+          ? raw.legal_sources
+          : [],
       clauses: [],
       analysis_markdown: raw?.analysis_markdown || data?.analysis_markdown || "",
       source: raw?.source,
@@ -173,6 +179,14 @@ class APIClient {
     );
     return response.data;
   }
+
+  async getContractLogs(contractId: string) {
+    const response = await this.client.get(
+      `/api/v1/contracts/${contractId}/logs`,
+    );
+    return response.data;
+  }
+
 
   async processContract(contractId: string) {
     const response = await this.client.post(

@@ -67,6 +67,7 @@ def get_contract_analysis_from_db(document_id: str) -> Optional[dict[str, Any]]:
             "low_issues": getattr(analysis, "low_issues", 0) or 0,
             "recommended_actions": getattr(analysis, "recommended_actions", []) or [],
             "clauses": formatted_clauses,
+            "legal_sources": getattr(analysis, "legal_sources", []) or [],
             "key_findings": analysis.key_findings,
             "unresolved_questions": analysis.unresolved_questions,
             "confidence": analysis.confidence,
@@ -178,6 +179,15 @@ def save_contract_analysis_to_db(document_id: str, analysis_data: dict[str, Any]
             else:
                 overall_risk_score = float(raw_score)
 
+            # Prepare legal sources
+            raw_legal_sources = analysis_data.get("legal_sources", [])
+            legal_sources_json = []
+            for ls in raw_legal_sources:
+                if isinstance(ls, dict):
+                    legal_sources_json.append(ls)
+                elif hasattr(ls, "model_dump"):
+                    legal_sources_json.append(ls.model_dump())
+
             # Create analysis record
             analysis_id = str(uuid.uuid4())
             analysis = ContractAnalysis(
@@ -192,6 +202,7 @@ def save_contract_analysis_to_db(document_id: str, analysis_data: dict[str, Any]
                 low_issues=low_issues,
                 recommended_actions=analysis_data.get("recommended_actions", []),
                 clauses=clauses_json,
+                legal_sources=legal_sources_json,
                 key_findings=analysis_data.get("key_findings", []),
                 unresolved_questions=analysis_data.get("unresolved_questions", []),
                 confidence=float(analysis_data.get("confidence", 0.85)),

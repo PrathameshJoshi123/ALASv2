@@ -3,6 +3,12 @@ Celery application configuration.
 Handles background task processing with Redis as the message broker.
 """
 
+import os
+from dotenv import load_dotenv
+
+# Ensure environment variables are loaded immediately for Celery workers
+load_dotenv()
+
 from celery import Celery
 from celery.schedules import crontab
 

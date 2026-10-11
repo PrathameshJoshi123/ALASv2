@@ -260,23 +260,30 @@ def process_and_chunk_task(
                                                 elif msg.type == "ai" and msg.content:
                                                     log_write(f"     └─ AI Response snippet: {str(msg.content)[:200]}...")
                                 else:
-                                    log_write("\n[Main Coordinator Agent] running node...")
+                                    log_write(f"\n[LangGraph Engine] running node: {list(data.keys())}...")
                                     for node_name, node_data in data.items():
                                         log_write(f"  └─ Step: {node_name}")
                                         
+                                        # Print messages / tool calls in coordinator / advisor nodes
+                                        if isinstance(node_data, dict) and "messages" in node_data:
+                                            for msg in node_data["messages"]:
+                                                if hasattr(msg, "tool_calls") and msg.tool_calls:
+                                                    for tc in msg.tool_calls:
+                                                        log_write(f"     └─ Autonomous Tool Call: {tc.get('name')}")
+                                                        log_write(f"        Arguments: {json.dumps(tc.get('args'))}")
+                                                elif getattr(msg, "type", None) == "tool" or (hasattr(msg, "name") and msg.__class__.__name__ == "ToolMessage"):
+                                                    log_write(f"     └─ Tool '{getattr(msg, 'name', 'tool')}' Output snippet: {str(msg.content)[:300]}...")
+                                                elif getattr(msg, "type", None) == "ai" and getattr(msg, "content", None):
+                                                    log_write(f"     └─ AI Response snippet: {str(msg.content)[:200]}...")
+
                                         # Accumulate/extract final structured response from the coordinator nodes
                                         if isinstance(node_data, dict):
                                             if "structured_response" in node_data and node_data["structured_response"] is not None:
                                                 agent_analysis = node_data["structured_response"]
+                                            elif "final_result" in node_data and node_data["final_result"] is not None:
+                                                agent_analysis = node_data["final_result"]
                                             elif "response" in node_data and node_data["response"] is not None:
                                                 agent_analysis = node_data["response"]
-                                                
-                                        # Look for subagent completion tool message
-                                        if node_name == "tools" and isinstance(node_data, dict) and "messages" in node_data:
-                                            for msg in node_data["messages"]:
-                                                if msg.type == "tool" and msg.name == "task":
-                                                    log_write(f"\n>>> Subagent execution completed: {msg.name}")
-                                                    log_write(f"    Result snippet: {str(msg.content)[:300]}...")
 
                     execute_with_exponential_backoff(run_stream_analysis)
 
@@ -414,23 +421,30 @@ def run_agent_analysis_task(
                                         elif msg.type == "ai" and msg.content:
                                             log_write(f"     └─ AI Response snippet: {str(msg.content)[:200]}...")
                         else:
-                            log_write("\n[Main Coordinator Agent] running node...")
+                            log_write(f"\n[LangGraph Engine] running node: {list(data.keys())}...")
                             for node_name, node_data in data.items():
                                 log_write(f"  └─ Step: {node_name}")
                                 
+                                # Print messages / tool calls in coordinator / advisor nodes
+                                if isinstance(node_data, dict) and "messages" in node_data:
+                                    for msg in node_data["messages"]:
+                                        if hasattr(msg, "tool_calls") and msg.tool_calls:
+                                            for tc in msg.tool_calls:
+                                                log_write(f"     └─ Autonomous Tool Call: {tc.get('name')}")
+                                                log_write(f"        Arguments: {json.dumps(tc.get('args'))}")
+                                        elif getattr(msg, "type", None) == "tool" or (hasattr(msg, "name") and msg.__class__.__name__ == "ToolMessage"):
+                                            log_write(f"     └─ Tool '{getattr(msg, 'name', 'tool')}' Output snippet: {str(msg.content)[:300]}...")
+                                        elif getattr(msg, "type", None) == "ai" and getattr(msg, "content", None):
+                                            log_write(f"     └─ AI Response snippet: {str(msg.content)[:200]}...")
+
                                 # Accumulate/extract final structured response from the coordinator nodes
                                 if isinstance(node_data, dict):
                                     if "structured_response" in node_data and node_data["structured_response"] is not None:
                                         agent_analysis = node_data["structured_response"]
+                                    elif "final_result" in node_data and node_data["final_result"] is not None:
+                                        agent_analysis = node_data["final_result"]
                                     elif "response" in node_data and node_data["response"] is not None:
                                         agent_analysis = node_data["response"]
-                                        
-                                # Look for subagent completion tool message
-                                if node_name == "tools" and isinstance(node_data, dict) and "messages" in node_data:
-                                    for msg in node_data["messages"]:
-                                        if msg.type == "tool" and msg.name == "task":
-                                            log_write(f"\n>>> Subagent execution completed: {msg.name}")
-                                            log_write(f"    Result snippet: {str(msg.content)[:300]}...")
 
             execute_with_exponential_backoff(run_stream_analysis_only)
 

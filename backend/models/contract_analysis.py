@@ -96,6 +96,12 @@ class ContractAnalysis(Base):
         nullable=False,
     )
     
+    legal_sources: Mapped[list[dict]] = mapped_column(
+        JSON,
+        default=list,
+        nullable=False,
+    )
+    
     confidence: Mapped[float] = mapped_column(
         Float,
         default=0.0,

@@ -8,6 +8,12 @@ Or run as module:
     python -m backend.worker
 """
 
+import os
+import sys
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from backend.celery_app import celery_app
 
 if __name__ == "__main__":

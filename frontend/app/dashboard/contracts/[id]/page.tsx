@@ -14,6 +14,10 @@ import {
   FileSearch,
   Bot,
   MessageSquare,
+  RotateCw,
+  BookOpen,
+  ExternalLink,
+  Scale,
 } from "lucide-react";
 import Link from "next/link";
 import toast from "react-hot-toast";
@@ -46,6 +50,8 @@ export default function ContractDetailsPage() {
   const [finalAnalysisPreview, setFinalAnalysisPreview] = useState("");
   const [pollingActive, setPollingActive] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [agentLogs, setAgentLogs] = useState<any[]>([]);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const [selectedObligationCategory, setSelectedObligationCategory] =
     useState<string>("ALL");
@@ -67,16 +73,55 @@ export default function ContractDetailsPage() {
     });
   };
 
+  const fetchAgentLogs = async () => {
+    try {
+      const data = await apiClient.getContractLogs(contractId);
+      setAgentLogs(data.logs || []);
+      return data;
+    } catch {
+      return null;
+    }
+  };
+
+  const runAnalysis = async () => {
+    try {
+      setIsAnalyzing(true);
+      setPollingActive(true);
+      await apiClient.analyzeContract(contractId);
+      toast.success("AI Contract Analysis started with Indian Kanoon research!");
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Failed to trigger analysis");
+      setIsAnalyzing(false);
+    }
+  };
+
+  const reanalyzeContract = async () => {
+    try {
+      setIsAnalyzing(true);
+      setPollingActive(true);
+      setAgentLogs([]);
+      await apiClient.analyzeContract(contractId);
+      toast.success("Re-analyzing contract: querying Indian Kanoon and evaluating clauses...");
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Failed to restart analysis");
+      setIsAnalyzing(false);
+    }
+  };
+
+
   useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+
     const fetchContractData = async (isInitial = false) => {
       try {
         if (isInitial) {
           setLoading(true);
         }
 
-        const [contractRes, analysisRes] = await Promise.all([
+        const [contractRes, analysisRes, logData] = await Promise.all([
           apiClient.getContractDetails(contractId),
           apiClient.getContractAnalysis(contractId),
+          fetchAgentLogs(),
         ]);
 
         setContract(contractRes);
@@ -98,7 +143,18 @@ export default function ContractDetailsPage() {
           setContractMarkdownPreview(previewText.slice(0, 900));
         }
 
-        setPollingActive(false);
+        // Determine if live worker is actively running
+        const isRunning =
+          contractRes?.status === "processing" ||
+          contractRes?.status === "uploaded" ||
+          (logData && !logData.is_complete && logData.total_logs > 0);
+
+        if (isRunning) {
+          setPollingActive(true);
+        } else if (analysisRes?.clauses?.length > 0 || logData?.is_complete) {
+          setPollingActive(false);
+          setIsAnalyzing(false);
+        }
       } catch (error) {
         if (isInitial) {
           toast.error("Failed to load contract details");
@@ -112,7 +168,14 @@ export default function ContractDetailsPage() {
 
     if (contractId) {
       fetchContractData(true);
+      interval = setInterval(() => {
+        fetchContractData(false);
+      }, 3000);
     }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
   }, [contractId]);
 
   const toggleClauseExpand = (clauseId: string) => {
@@ -211,10 +274,40 @@ export default function ContractDetailsPage() {
         </div>
 
         <div className="flex items-center gap-3">
+          {analysis?.analysis_complete ? (
+            <button
+              type="button"
+              onClick={reanalyzeContract}
+              disabled={isAnalyzing || pollingActive}
+              className="flex items-center gap-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-md transition-all cursor-pointer"
+            >
+              {isAnalyzing || pollingActive ? (
+                <Loader2 className="w-4 h-4 animate-spin text-white" />
+              ) : (
+                <RotateCw className="w-4 h-4 text-white" />
+              )}
+              <span>{isAnalyzing || pollingActive ? "Re-analyzing..." : "Re-analyze Contract"}</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={runAnalysis}
+              disabled={isAnalyzing || pollingActive}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-md transition-all cursor-pointer"
+            >
+              {isAnalyzing || pollingActive ? (
+                <Loader2 className="w-4 h-4 animate-spin text-white" />
+              ) : (
+                <FileSearch className="w-4 h-4 text-white" />
+              )}
+              <span>{isAnalyzing || pollingActive ? "Analyzing..." : "Run AI Analysis"}</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => setIsChatOpen(true)}
-            className="flex items-center gap-2 bg-[#0B1437] hover:bg-[#152458] text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md transition-all cursor-pointer"
+            className="flex items-center gap-2 bg-[#0B1437] hover:bg-[#152458] text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-md transition-all cursor-pointer"
           >
             <Bot className="w-5 h-5 text-blue-400" />
             <span>Ask AI Jurist</span>
@@ -291,6 +384,81 @@ export default function ContractDetailsPage() {
               {contract?.live?.vector_store_ready ? "Ready" : "Pending"}
             </p>
           </div>
+        </div>
+      </div>
+
+      {/* Real-time Agent Thinking & Indian Kanoon Tool Execution Log */}
+      <div className="bg-slate-950 rounded-2xl shadow-xl border border-slate-800 p-6 overflow-hidden">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-indigo-500/10 rounded-lg border border-indigo-500/20">
+              <Bot className="w-5 h-5 text-indigo-400" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-white tracking-wide">
+                  LangGraph Agent & Indian Kanoon Execution Log
+                </h2>
+                {pollingActive ? (
+                  <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 animate-pulse">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                    Live Processing
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-400 border border-slate-700">
+                    Completed
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Deterministic state graph milestones, autonomous reasoning steps, and scraped Indian Kanoon citations
+              </p>
+            </div>
+          </div>
+          <div className="text-xs font-mono px-3 py-1 bg-slate-900 border border-slate-800 rounded-lg text-slate-400">
+            {agentLogs.length} Events Logged
+          </div>
+        </div>
+
+        {/* Terminal Console */}
+        <div className="bg-slate-900/90 rounded-xl border border-slate-800/80 p-4 font-mono text-xs max-h-72 overflow-y-auto space-y-2 select-text shadow-inner">
+          {agentLogs.length === 0 ? (
+            <div className="py-8 text-center text-slate-500">
+              {pollingActive
+                ? "Agent is initializing LangGraph nodes and querying database chunks..."
+                : "No live agent logs recorded yet. Click 'Run AI Analysis' to execute the LangGraph agent."}
+            </div>
+          ) : (
+            agentLogs.map((log: any, idx: number) => {
+              let badgeColor = "text-slate-400";
+              let contentColor = "text-slate-300";
+
+              if (log.type === "tool_call") {
+                badgeColor = "text-amber-400 font-semibold";
+                contentColor = "text-amber-200";
+              } else if (log.type === "kanoon") {
+                badgeColor = "text-cyan-400 font-semibold";
+                contentColor = "text-cyan-200";
+              } else if (log.type === "node") {
+                badgeColor = "text-indigo-400 font-bold";
+                contentColor = "text-indigo-200";
+              } else if (log.type === "finding") {
+                badgeColor = "text-emerald-400";
+                contentColor = "text-emerald-200";
+              }
+
+              return (
+                <div key={idx} className="flex items-start gap-2 border-b border-slate-800/40 pb-1.5 last:border-0 last:pb-0">
+                  <span className={`shrink-0 ${badgeColor}`}>
+                    [{log.type ? log.type.toUpperCase() : "STEP"}]
+                  </span>
+                  <span className={`break-words ${contentColor}`}>
+                    {log.detail}
+                  </span>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
 
@@ -430,6 +598,91 @@ export default function ContractDetailsPage() {
           )}
         </div>
       </div>
+
+      {/* Researched Indian Kanoon Precedents & Statutory Sources */}
+      <div className="bg-white rounded-lg shadow border border-slate-200 overflow-hidden">
+        <div className="px-8 py-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Scale className="w-5 h-5 text-purple-600" />
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">
+                Researched Indian Kanoon Precedents & Statutory Authorities
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Statutes, High Court & Supreme Court rulings retrieved and verified by the Autonomous Legal Advisor
+              </p>
+            </div>
+          </div>
+          <span className="px-3 py-1 bg-purple-100 text-purple-800 text-xs font-semibold rounded-full">
+            {(analysis?.legal_sources || []).length} Verified Authorities
+          </span>
+        </div>
+        <div className="p-8">
+          {(analysis?.legal_sources || []).length === 0 ? (
+            <div className="p-6 text-center rounded-lg border border-dashed border-slate-200 bg-slate-50">
+              <BookOpen className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+              <p className="text-sm text-slate-600 font-medium">
+                No external Indian Kanoon authorities recorded for this document yet.
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                Click "Re-analyze Contract" to trigger live scraping and judicial precedent lookup on indiankanoon.org.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {(analysis?.legal_sources || []).map((source: any, idx: number) => (
+                <div
+                  key={source.doc_id || idx}
+                  className="p-5 rounded-xl bg-slate-50 border border-slate-200 hover:border-purple-300 transition-all space-y-3"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 bg-purple-100 text-purple-800 text-xs font-bold rounded">
+                          {source.statute_or_court || "Indian Authority"}
+                        </span>
+                        {source.doc_id && (
+                          <span className="text-xs text-slate-500 font-mono">
+                            Doc ID: {source.doc_id}
+                          </span>
+                        )}
+                      </div>
+                      <h4 className="font-bold text-slate-900 text-sm leading-snug">
+                        {source.title}
+                      </h4>
+                    </div>
+                    {source.url && (
+                      <a
+                        href={source.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-1.5 rounded-lg bg-white border border-slate-200 text-purple-600 hover:text-purple-800 hover:bg-purple-50 transition shrink-0"
+                        title="View source on Indian Kanoon"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
+                    )}
+                  </div>
+
+                  {source.relevance_summary && (
+                    <p className="text-xs text-slate-700 leading-relaxed bg-white p-3 rounded-lg border border-slate-200">
+                      <strong className="font-semibold text-slate-800">Relevance:</strong>{" "}
+                      {source.relevance_summary}
+                    </p>
+                  )}
+
+                  {source.key_provision_or_ratio && (
+                    <p className="text-xs text-purple-900 bg-purple-50 p-2.5 rounded border border-purple-200 font-mono line-clamp-3">
+                      {source.key_provision_or_ratio}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
 
       {/* Categorized Obligations Section */}
       <div className="bg-white rounded-lg shadow border border-slate-200 overflow-hidden">

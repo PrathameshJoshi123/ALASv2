@@ -6,6 +6,9 @@ backoff retry helpers for Mistral API calls.
 import os
 import logging
 from typing import Any, Callable, TypeVar
+from dotenv import load_dotenv
+
+load_dotenv()
 from tenacity import (
     retry,
     stop_after_attempt,
