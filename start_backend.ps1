@@ -87,12 +87,28 @@ if (-not $redisConnected) {
     if ($started) {
         $redisCheck = & $VenvPython -c "import redis; r = redis.Redis.from_url('redis://localhost:6379/0'); r.ping(); print('OK')" 2>$null
         if ($redisCheck -eq "OK") {
+            $redisConnected = $true
             Write-Host "[OK] Successfully started and connected to Redis via Docker!" -ForegroundColor Green
         } else {
             Write-Host "[WARNING] Redis container started, but ping not yet responding. Proceeding..." -ForegroundColor Yellow
         }
     } else {
         Write-Host "[WARNING] Docker Redis could not be started automatically. Ensure Redis is running." -ForegroundColor Yellow
+    }
+}
+
+# Flush Redis so stale tasks/queues from previous sessions are wiped clean on every new startup
+if ($redisConnected) {
+    Write-Host "[REDIS] Flushing all Redis databases (FLUSHALL) for a clean server start..." -ForegroundColor Cyan
+    try {
+        $flushResult = & $VenvPython -c "import redis; r = redis.Redis.from_url('redis://localhost:6379/0'); r.flushall(); print('FLUSHED')" 2>$null
+        if ($flushResult -eq "FLUSHED") {
+            Write-Host "[OK] Redis database flushed successfully." -ForegroundColor Green
+        } else {
+            Write-Host "[WARNING] Could not flush Redis: $flushResult" -ForegroundColor Yellow
+        }
+    } catch {
+        Write-Host "[WARNING] Error while attempting to flush Redis: $_" -ForegroundColor Yellow
     }
 }
 

@@ -559,6 +559,7 @@ def get_document(
     from backend.services.contract_analysis_service import get_contract_analysis_from_db
     db_analysis = get_contract_analysis_from_db(document.id) or {}
     
+    # Check drafted contract markdown first
     draft_md_file = Path("backend/storage/outputs") / f"{document.id}_drafted_contract.md"
     if draft_md_file.exists():
         try:
@@ -566,6 +567,53 @@ def get_document(
             db_analysis["analysis_markdown"] = draft_content
         except Exception as e:
             logger.warning(f"Failed to read drafted contract markdown for document {document.id}: {e}")
+    else:
+        # Fallback to parsed elements json or synthesized text
+        parsed_json_file = Path("backend/storage/output") / f"{document.id}.json"
+        if parsed_json_file.exists():
+            try:
+                import json as _json
+                data = _json.loads(parsed_json_file.read_text(encoding="utf-8"))
+                elements = data.get("elements", [])
+                lines = []
+                for el in elements:
+                    txt = el.get("text", "").strip() if isinstance(el, dict) else ""
+                    if not txt:
+                        continue
+                    el_type = el.get("type", "")
+                    if el_type == "Title":
+                        lines.append(f"\n### {txt}\n")
+                    else:
+                        lines.append(txt)
+                if lines:
+                    db_analysis["analysis_markdown"] = "\n\n".join(lines)
+            except Exception as e:
+                logger.warning(f"Failed to extract markdown from elements json for {document.id}: {e}")
+
+    # Fallback to database chunks if still empty
+    if not db_analysis.get("analysis_markdown"):
+        try:
+            from backend.services.chunking.database import Chunk
+            chunks = db.execute(
+                select(Chunk).where(Chunk.document_id == document.id).order_by(Chunk.sequence_number.asc())
+            ).scalars().all()
+            if chunks:
+                chunk_texts = [c.content for c in chunks if c.content and c.content.strip()]
+                if chunk_texts:
+                    db_analysis["analysis_markdown"] = "\n\n".join(chunk_texts)
+        except Exception as e:
+            logger.warning(f"Failed to extract markdown from chunks for {document.id}: {e}")
+
+    # Fallback to clauses text if still empty
+    if not db_analysis.get("analysis_markdown") and db_analysis.get("clauses"):
+        clause_blocks = []
+        for c in db_analysis.get("clauses", []):
+            if isinstance(c, dict):
+                title = c.get("section_title") or f"Clause {c.get('clause_number', '')}"
+                raw = c.get("raw_text", "")
+                clause_blocks.append(f"### {title}\n\n{raw}")
+        if clause_blocks:
+            db_analysis["analysis_markdown"] = "\n\n".join(clause_blocks)
     
     return DocumentResponse(
         id=document.id,
@@ -589,6 +637,7 @@ def get_document(
         recommended_actions=db_analysis.get("recommended_actions", []),
         clauses=db_analysis.get("clauses", []),
         analysis=db_analysis,
+        analysis_markdown=db_analysis.get("analysis_markdown", ""),
     )
 
 
@@ -697,72 +746,85 @@ def ask_contract_question_endpoint(
                 "citations": [],
             }
 
-        agent = create_retrieval_agent()
-        prompt_msg = (
-            f"Target Document ID: '{document_id}'\n\n"
-            f"Question: {request.question}\n\n"
-            f"Instructions:\n"
-            f"1. Call search_chunks_vector_db or search_chunks_bm25 using document_id '{document_id}' to retrieve relevant sections.\n"
-            f"2. If needed, call get_surrounding_chunks or get_chunk_by_sequence to read surrounding context.\n"
-            f"3. Synthesize a complete grounded answer with citations. If no relevant info is found, state that directly."
-        )
+        logger.info(f"Invoking LangGraph Jurist RAG for document {document_id} with question: {request.question}")
+        from backend.agents.jurist_rag_langgraph import run_jurist_rag
+        from backend.models.contract_analysis import ContractChatMessage
         
-        state = agent.invoke({"messages": [HumanMessage(content=prompt_msg)]})
-        agent_result = state.get("structured_response") or state.get("response")
+        result_payload = run_jurist_rag(document_id=document_id, question=request.question)
         
-        answer_text = ""
-        citations = []
-        
-        if agent_result:
-            if hasattr(agent_result, "model_dump"):
-                res_dict = agent_result.model_dump()
-                answer_text = res_dict.get("answer", "")
-                citations = res_dict.get("citations", [])
-                if not answer_text and res_dict.get("unresolved_parts"):
-                    answer_text = "Based on the contract document, the following details could not be resolved:\n" + "\n".join(f"- {u}" for u in res_dict["unresolved_parts"])
-            elif isinstance(agent_result, dict):
-                answer_text = agent_result.get("answer", "")
-                citations = agent_result.get("citations", [])
-                if not answer_text and agent_result.get("unresolved_parts"):
-                    answer_text = "Based on the contract document, the following details could not be resolved:\n" + "\n".join(f"- {u}" for u in agent_result["unresolved_parts"])
-            else:
-                answer_text = str(agent_result)
-        
-        if not answer_text:
-            messages = state.get("messages", [])
-            for msg in reversed(messages):
-                if hasattr(msg, "type") and msg.type == "ai":
-                    content = getattr(msg, "content", "")
-                    if isinstance(content, str) and content.strip():
-                        answer_text = content.strip()
-                        break
-                    elif isinstance(content, list):
-                        text_parts = [
-                            b.get("text", "") if isinstance(b, dict) else str(b)
-                            for b in content
-                            if not isinstance(b, dict) or b.get("type") == "text"
-                        ]
-                        extracted = "\n".join(filter(None, text_parts)).strip()
-                        if extracted:
-                            answer_text = extracted
-                            break
-        
-        if not answer_text:
-            answer_text = "Based on the provided contract document, no relevant information was found for your question."
-            
-        return {
-            "status": "success",
-            "document_id": document_id,
-            "question": request.question,
-            "answer": answer_text,
-            "citations": citations,
-        }
+        # Save Q&A to database for persistent history
+        try:
+            chat_record = ContractChatMessage(
+                id=str(uuid.uuid4()),
+                document_id=document_id,
+                question=request.question,
+                answer=result_payload.get("answer", ""),
+                citations=result_payload.get("citations", []),
+            )
+            db.add(chat_record)
+            db.commit()
+            result_payload["id"] = chat_record.id
+            result_payload["created_at"] = chat_record.created_at.isoformat()
+        except Exception as save_err:
+            logger.warning(f"Could not persist contract chat message for doc {document_id}: {save_err}")
+            db.rollback()
+
+        return result_payload
     except Exception as e:
         logger.error(f"Failed QA query for document {document_id}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to run QA query: {e}",
         )
+
+
+@router.get(
+    "/{document_id}/qa/history",
+    summary="Get saved Ask Jurist Q&A chat history for a contract",
+    description="Retrieve all saved questions, answers, and citations for a contract document.",
+)
+def get_contract_qa_history_endpoint(
+    document_id: str,
+    db: Session = Depends(get_db),
+):
+    """Retrieve saved chat history for a contract."""
+    from backend.models.contract_analysis import ContractChatMessage
+    messages = db.execute(
+        select(ContractChatMessage)
+        .where(ContractChatMessage.document_id == document_id)
+        .order_by(ContractChatMessage.created_at.asc())
+    ).scalars().all()
+
+    return {
+        "status": "success",
+        "document_id": document_id,
+        "total_messages": len(messages),
+        "history": [m.to_dict() for m in messages],
+    }
+
+
+@router.delete(
+    "/{document_id}/qa/history",
+    summary="Clear Ask Jurist Q&A chat history for a contract",
+    description="Delete all saved Q&A messages for a contract document.",
+)
+def clear_contract_qa_history_endpoint(
+    document_id: str,
+    db: Session = Depends(get_db),
+):
+    """Clear chat history for a contract."""
+    from backend.models.contract_analysis import ContractChatMessage
+    from sqlalchemy import delete
+    db.execute(
+        delete(ContractChatMessage).where(ContractChatMessage.document_id == document_id)
+    )
+    db.commit()
+    return {
+        "status": "success",
+        "document_id": document_id,
+        "message": "Chat history cleared successfully.",
+    }
+
 
 
 @router.post(
@@ -871,4 +933,125 @@ def get_contract_agent_logs(
         "total_logs": len(all_logs),
         "logs": all_logs,
     }
+
+
+# ============================================================
+# Post-Analysis Contract Revision & Redlining Endpoints
+# ============================================================
+
+from backend.services.contract_revision_service import (
+    RedraftClauseRequest,
+    ClauseRevisionResponse,
+    ApplyRevisionRequest,
+    generate_clause_redraft,
+    apply_clause_revision_to_db,
+)
+
+
+@router.post(
+    "/{document_id}/redraft-clause",
+    response_model=ClauseRevisionResponse,
+    summary="Redraft a specific clause based on analysis and prompt instructions",
+    description="Intelligently redraft a specific contract clause resolving flagged legal risks and honoring custom user instructions.",
+)
+def redraft_contract_clause_endpoint(
+    document_id: str,
+    request: RedraftClauseRequest,
+    db: Session = Depends(get_db),
+) -> ClauseRevisionResponse:
+    """Redraft an analyzed contract clause with statutory compliance."""
+    result = db.execute(select(Document).where(Document.id == document_id))
+    document = result.scalar_one_or_none()
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document with ID {document_id} not found",
+        )
+
+    try:
+        revision_res = generate_clause_redraft(document_id, request)
+        return revision_res
+    except Exception as e:
+        logger.error(f"Failed to redraft clause for doc {document_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate clause redraft: {e}",
+        )
+
+
+@router.post(
+    "/{document_id}/apply-revision",
+    summary="Apply an approved revised clause to the contract",
+    description="Save an approved clause redraft to the document analysis record and update risk metrics.",
+)
+def apply_contract_revision_endpoint(
+    document_id: str,
+    request: ApplyRevisionRequest,
+    db: Session = Depends(get_db),
+):
+    """Apply an approved clause amendment to the contract record."""
+    result = db.execute(select(Document).where(Document.id == document_id))
+    document = result.scalar_one_or_none()
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document with ID {document_id} not found",
+        )
+
+    try:
+        apply_res = apply_clause_revision_to_db(
+            document_id=document_id,
+            clause_id=request.clause_id,
+            revised_text=request.revised_text,
+            rationale=request.rationale or "",
+        )
+        if apply_res.get("status") == "error":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=apply_res.get("message"),
+            )
+        return apply_res
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to apply clause revision for doc {document_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to apply revision: {e}",
+        )
+
+
+class SaveContractContentRequest(BaseModel):
+    content: str
+
+
+@router.post(
+    "/{document_id}/save-content",
+    summary="Save user edited contract content",
+    description="Save edited contract markdown content to disk and update document timestamp.",
+)
+def save_contract_content_endpoint(
+    document_id: str,
+    request: SaveContractContentRequest,
+    db: Session = Depends(get_db),
+):
+    """Save user edits from the contract editor."""
+    from backend.services.contract_revision_service import save_contract_content
+    result = db.execute(select(Document).where(Document.id == document_id))
+    document = result.scalar_one_or_none()
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document with ID {document_id} not found",
+        )
+    try:
+        res = save_contract_content(document_id, request.content)
+        return res
+    except Exception as e:
+        logger.error(f"Failed to save contract content for doc {document_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to save contract content: {e}",
+        )
+
 

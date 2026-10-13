@@ -128,7 +128,12 @@ class APIClient {
           ? raw.legal_sources
           : [],
       clauses: [],
-      analysis_markdown: raw?.analysis_markdown || data?.analysis_markdown || "",
+      analysis_markdown:
+        raw?.analysis_markdown ||
+        raw?.analysis?.analysis_markdown ||
+        data?.analysis_markdown ||
+        data?.analysis?.analysis_markdown ||
+        "",
       source: raw?.source,
       status: raw?.status,
       live: raw?.live,
@@ -209,6 +214,55 @@ class APIClient {
     );
     return response.data;
   }
+
+  async getContractQAHistory(contractId: string) {
+    const response = await this.client.get(
+      `/api/v1/contracts/${contractId}/qa/history`,
+    );
+    return response.data;
+  }
+
+  async clearContractQAHistory(contractId: string) {
+    const response = await this.client.delete(
+      `/api/v1/contracts/${contractId}/qa/history`,
+    );
+    return response.data;
+  }
+
+  async redraftClause(contractId: string, payload: {
+    clause_id?: string;
+    clause_title?: string;
+    original_text: string;
+    custom_prompt?: string;
+    favor_party?: string;
+  }) {
+    const response = await this.client.post(
+      `/api/v1/contracts/${contractId}/redraft-clause`,
+      payload,
+    );
+    return response.data;
+  }
+
+  async applyClauseRevision(contractId: string, payload: {
+    clause_id: string;
+    revised_text: string;
+    rationale?: string;
+  }) {
+    const response = await this.client.post(
+      `/api/v1/contracts/${contractId}/apply-revision`,
+      payload,
+    );
+    return response.data;
+  }
+
+  async saveContractContent(contractId: string, content: string) {
+    const response = await this.client.post(
+      `/api/v1/contracts/${contractId}/save-content`,
+      { content },
+    );
+    return response.data;
+  }
+
 
 
 

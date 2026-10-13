@@ -9,16 +9,17 @@ import {
   CheckCircle2,
   AlertTriangle,
   Globe,
-  Plus,
-  MessageSquare,
   Loader2,
   Sparkles,
   Bot,
   Send,
-  History,
   X,
   FileText,
   Download,
+  Wand2,
+  ShieldAlert,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { apiClient } from "@/services/api";
@@ -26,16 +27,30 @@ import { useSearchParams } from "next/navigation";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import React from "react";
+import { ClauseRedlineModal } from "@/components/dashboard/ClauseRedlineModal";
+import { AISelectionModal } from "@/components/dashboard/AISelectionModal";
 
 const DocumentEditor = React.memo(
-  function DocumentEditor({ contract, htmlContent, onInput }: any) {
+  function DocumentEditor({
+    contract,
+    htmlContent,
+    onInput,
+    onMouseUp,
+  }: {
+    contract: any;
+    htmlContent: string;
+    onInput: () => void;
+    onMouseUp: () => void;
+  }) {
     return (
       <div
         id="contract-document-content"
         contentEditable
         suppressContentEditableWarning
         onInput={onInput}
-        className="outline-none focus:bg-slate-50/50 p-4 -mx-4 rounded-2xl transition-colors"
+        onMouseUp={onMouseUp}
+        onKeyUp={onMouseUp}
+        className="outline-none focus:bg-slate-50/50 p-4 -mx-4 rounded-2xl transition-colors selection:bg-blue-100 selection:text-blue-900"
       >
         <h1 className="text-[32px] font-bold text-[#0B1437] mb-6 tracking-tight">
           {(
@@ -78,8 +93,27 @@ export default function TenantFilesPage() {
   const [htmlContent, setHtmlContent] = useState<string>("");
   const [fetching, setFetching] = useState(!!contractId);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [isChatOpen, setIsChatOpen] = useState(false);
+
+  // Right sidebar tab: "analysis" (Risk & Edit Suggestions) or "chat" (Ask AI Jurist)
+  const [rightPanelTab, setRightPanelTab] = useState<"analysis" | "chat">("analysis");
+
+  // Selection AI Editing state
+  const [floatingPill, setFloatingPill] = useState<{
+    text: string;
+    x: number;
+    y: number;
+    range: Range;
+  } | null>(null);
+  const [isSelectionModalOpen, setIsSelectionModalOpen] = useState(false);
+  const [selectedSnippet, setSelectedSnippet] = useState("");
+  const [savedRange, setSavedRange] = useState<Range | null>(null);
+
+  // Clause Redline state for suggestions
+  const [activeClauseForRedraft, setActiveClauseForRedraft] = useState<any | null>(null);
+
+  // Chat Q&A state
   const [qaInput, setQaInput] = useState("");
   const [qaLoading, setQaLoading] = useState(false);
   const [qaHistory, setQaHistory] = useState<
@@ -120,12 +154,14 @@ export default function TenantFilesPage() {
     async function parseMarkdown() {
       const content =
         analysis?.analysis_markdown ||
+        contract?.analysis_markdown ||
+        contract?.analysis?.analysis_markdown ||
         "Analysis markdown will appear here once processing is complete.";
       const sanitized = await renderMarkdownToHtml(content);
       setHtmlContent(sanitized);
     }
     parseMarkdown();
-  }, [analysis?.analysis_markdown, renderMarkdownToHtml]);
+  }, [analysis?.analysis_markdown, contract?.analysis_markdown, contract?.analysis?.analysis_markdown, renderMarkdownToHtml]);
 
   const fetchContractData = useCallback(
     async (isPolling = false) => {
@@ -138,7 +174,6 @@ export default function TenantFilesPage() {
         ]);
         setContract(contractData);
         setAnalysis(analysisData);
-
         setPollingActive(false);
       } catch (error) {
         console.error("Failed to fetch contract data", error);
@@ -171,15 +206,15 @@ export default function TenantFilesPage() {
         try {
           const statusRes = await apiClient.getProcessingStatus(contractId, taskId);
           const taskStatus = statusRes?.status || statusRes?.state;
-          
+
           if (taskStatus === "SUCCESS" || statusRes?.successful) {
             if (pollInterval) clearInterval(pollInterval);
             clearInterval(stepInterval);
-            
+
             await fetchContractData(false);
             setIsGenerating(false);
             toast.success("Contract drafted successfully by AI Agent!");
-            
+
             const url = new URL(window.location.href);
             url.searchParams.delete("generating");
             url.searchParams.delete("drafting");
@@ -227,17 +262,104 @@ export default function TenantFilesPage() {
     });
   }, []);
 
-  const handleSaveAndAnalyze = async () => {
-    if (!contractId) return;
+  // Track text selection for floating AI edit pill
+  const handleEditorMouseUp = useCallback(() => {
+    setTimeout(() => {
+      const selection = window.getSelection();
+      if (!selection || selection.isCollapsed) {
+        setFloatingPill(null);
+        return;
+      }
 
-    setIsAnalyzing(true);
-    const analysisToast = toast.loading(
-      "Analyzing contract with DeepAgents...",
-    );
+      const text = selection.toString().trim();
+      if (text.length < 3) {
+        setFloatingPill(null);
+        return;
+      }
+
+      const editor = document.getElementById("contract-document-content");
+      if (!editor || !selection.anchorNode || !editor.contains(selection.anchorNode)) {
+        setFloatingPill(null);
+        return;
+      }
+
+      try {
+        const range = selection.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        setFloatingPill({
+          text,
+          x: Math.max(20, rect.left + rect.width / 2),
+          y: Math.max(20, rect.top - 12),
+          range: range.cloneRange(),
+        });
+      } catch (e) {
+        setFloatingPill(null);
+      }
+    }, 50);
+  }, []);
+
+  const handleOpenSelectionEditor = () => {
+    if (!floatingPill) return;
+    setSelectedSnippet(floatingPill.text);
+    setSavedRange(floatingPill.range);
+    setIsSelectionModalOpen(true);
+    setFloatingPill(null);
+  };
+
+  const handleApplySelectionReplacement = (replacementText: string) => {
+    const editor = document.getElementById("contract-document-content");
+    if (savedRange && editor) {
+      try {
+        const selection = window.getSelection();
+        if (selection) {
+          selection.removeAllRanges();
+          selection.addRange(savedRange);
+          document.execCommand("insertText", false, replacementText);
+        }
+      } catch (err) {
+        if (selectedSnippet) {
+          editor.innerHTML = editor.innerHTML.replace(selectedSnippet, replacementText);
+        }
+      }
+    } else if (selectedSnippet && editor) {
+      editor.innerHTML = editor.innerHTML.replace(selectedSnippet, replacementText);
+    }
+    setHasUnsavedChanges(true);
+  };
+
+  const getEditorContent = () => {
+    const editor = document.getElementById("contract-document-content");
+    if (!editor) return "";
+    return editor.innerText || editor.textContent || "";
+  };
+
+  const handleSaveDraft = async () => {
+    if (!contractId) return;
+    const content = getEditorContent();
+    setIsSaving(true);
+    const saveToast = toast.loading("Saving contract draft...");
 
     try {
-      // 1. In a real app, we would save the content first.
-      // 2. Trigger analysis
+      await apiClient.saveContractContent(contractId, content);
+      setHasUnsavedChanges(false);
+      toast.success("Draft saved successfully!", { id: saveToast });
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || "Failed to save draft.", { id: saveToast });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveAndAnalyze = async () => {
+    if (!contractId) return;
+    const content = getEditorContent();
+    setIsAnalyzing(true);
+    const analysisToast = toast.loading("Saving and analyzing contract...");
+
+    try {
+      if (content) {
+        await apiClient.saveContractContent(contractId, content);
+      }
       await apiClient.analyzeContract(contractId);
       const result = await apiClient.getContractAnalysis(contractId);
       setAnalysis(result);
@@ -245,12 +367,39 @@ export default function TenantFilesPage() {
       toast.success("Analysis complete. Risk profile updated!", {
         id: analysisToast,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Analysis failed", error);
-      toast.error("Failed to re-analyze contract.", { id: analysisToast });
+      toast.error(error?.response?.data?.detail || "Failed to re-analyze contract.", { id: analysisToast });
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  // Open Clause Redline from right sidebar suggestion
+  const handleOpenClauseRedraft = (clause: any, index: number) => {
+    setActiveClauseForRedraft({
+      id: String(clause.id || clause.clause_number || index + 1),
+      section_title: clause.section_title || clause.title || `Clause ${index + 1}`,
+      clause_type: clause.clause_type || "General Provision",
+      raw_text: clause.raw_text || "",
+      severity: clause.severity || "MEDIUM",
+      risk_description: clause.risk_description || "",
+      legal_reasoning: clause.legal_reasoning || "",
+    });
+  };
+
+  const handleClauseRevisionApplied = (revisedText: string, originalText: string) => {
+    const editor = document.getElementById("contract-document-content");
+    if (editor && originalText) {
+      const orig = originalText.trim();
+      if (editor.innerText.includes(orig)) {
+        editor.innerText = editor.innerText.replace(orig, revisedText);
+      } else if (editor.innerHTML.includes(orig)) {
+        editor.innerHTML = editor.innerHTML.replace(orig, revisedText);
+      }
+    }
+    setHasUnsavedChanges(true);
+    fetchContractData(true);
   };
 
   const getSeverityColor = (sev: string) => {
@@ -293,7 +442,6 @@ export default function TenantFilesPage() {
     const question = qaInput.trim();
     const pendingId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-    // Move the prompt into the thread immediately and clear composer text.
     setQaInput("");
 
     setQaHistory((prev) => [
@@ -375,13 +523,13 @@ export default function TenantFilesPage() {
   };
 
   useEffect(() => {
-    if (!isChatOpen || !qaThreadRef.current) return;
+    if (rightPanelTab !== "chat" || !qaThreadRef.current) return;
 
     qaThreadRef.current.scrollTo({
       top: qaThreadRef.current.scrollHeight,
       behavior: "smooth",
     });
-  }, [qaHistory, qaLoading, isChatOpen]);
+  }, [qaHistory, qaLoading, rightPanelTab]);
 
   const quickPrompts = [
     "Rewrite indemnity to be vendor-friendly and capped.",
@@ -481,11 +629,6 @@ export default function TenantFilesPage() {
     );
   }
 
-  // Pre-load a mock template if we just finished generating and have no real contractId
-  const showMockGenerated =
-    !contractId && !fetching && searchParams.get("generated") === "true";
-  const isTemplateGenerationView = searchParams.get("generated") === "true";
-
   const toggleClause = (idx: number) => {
     const newSet = new Set(expandedClauses);
     if (newSet.has(idx)) {
@@ -501,7 +644,7 @@ export default function TenantFilesPage() {
       <div className="flex w-full h-[calc(100vh-70px)] items-center justify-center bg-white flex-col gap-4">
         <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
         <p className="text-slate-500 font-bold tracking-widest text-[12px] uppercase">
-          Retrieving Analysis...
+          Retrieving Document & Analysis...
         </p>
       </div>
     );
@@ -509,19 +652,43 @@ export default function TenantFilesPage() {
 
   return (
     <div className="flex w-full h-[calc(100vh-70px)] text-slate-900 bg-white">
-      {/* Main Document Viewer Panel */}
-      <div className="flex-[2] flex flex-col h-full border-r border-slate-200 relative">
-        {/* Document Header */}
-        <div className="flex items-center justify-between px-10 py-5 border-b border-slate-100 bg-white shrink-0">
-          <div className="flex items-center gap-4">
-            <h2 className="text-[11px] font-bold tracking-widest text-[#0B1437] opacity-60 uppercase">
+      {/* Floating Pill for Selection AI Editing */}
+      {floatingPill && (
+        <div
+          id="ai-selection-floating-pill"
+          style={{
+            position: "fixed",
+            left: `${floatingPill.x}px`,
+            top: `${floatingPill.y}px`,
+            transform: "translate(-50%, -100%)",
+            zIndex: 40,
+          }}
+          className="animate-in fade-in zoom-in-95 duration-150"
+        >
+          <button
+            type="button"
+            onClick={handleOpenSelectionEditor}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#0B1437] hover:bg-[#1C2B62] text-white text-xs font-bold shadow-2xl border border-blue-400/40 hover:scale-105 active:scale-95 transition-all cursor-pointer"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-blue-400 animate-pulse" />
+            <span>Edit with AI</span>
+          </button>
+        </div>
+      )}
+
+      {/* Main Document Viewer & Editor Panel */}
+      <div className="flex-[2] flex flex-col h-full border-r border-slate-200 relative min-w-0">
+        {/* Document Header Toolbar */}
+        <div className="flex items-center justify-between px-8 py-4 border-b border-slate-200 bg-white shrink-0">
+          <div className="flex items-center gap-3">
+            <h2 className="text-[11px] font-bold tracking-widest text-[#0B1437] opacity-60 uppercase truncate max-w-[280px]">
               DOCUMENT /{" "}
               {contract?.original_filename ||
                 contract?.markdown_file ||
                 "No Document Selected"}
             </h2>
             <span
-              className={`px-2.5 py-1.5 rounded-md text-[9px] font-bold tracking-widest uppercase transition-colors ${
+              className={`px-2.5 py-1 rounded-md text-[9px] font-bold tracking-widest uppercase transition-colors ${
                 hasUnsavedChanges
                   ? "bg-amber-100 text-amber-700"
                   : "bg-[#Eef3FE] text-[#3B5FE5]"
@@ -532,337 +699,165 @@ export default function TenantFilesPage() {
                 : contract?.status || "DRAFT"}
             </span>
             {pollingActive && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[9px] font-bold tracking-widest uppercase bg-blue-100 text-blue-700">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[9px] font-bold tracking-widest uppercase bg-blue-100 text-blue-700">
                 <Loader2 className="w-3 h-3 animate-spin" /> LIVE POLLING
               </span>
             )}
           </div>
-          <div className="flex items-center gap-6">
+
+          <div className="flex items-center gap-3">
             <button
               onClick={handleExportPdf}
               disabled={!contractId || !htmlContent}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors disabled:opacity-50 cursor-pointer"
             >
-              <Download className="w-4 h-4" /> Export PDF
+              <Download className="w-3.5 h-3.5" /> Export PDF
             </button>
-            <div className="w-px h-6 bg-slate-200"></div>
-            <button className="text-slate-400 hover:text-slate-700 transition">
-              <Undo2 className="w-4 h-4" />
+
+            <button
+              onClick={handleSaveDraft}
+              disabled={isSaving || !contractId}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-colors disabled:opacity-50 cursor-pointer"
+            >
+              {isSaving ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-600" />
+              ) : (
+                <Save className="w-3.5 h-3.5 text-slate-600" />
+              )}
+              <span>Save Draft</span>
             </button>
-            <button className="text-slate-400 hover:text-slate-700 transition">
-              <Redo2 className="w-4 h-4" />
-            </button>
-            <div className="w-px h-6 bg-slate-200"></div>
+
             <button
               onClick={handleSaveAndAnalyze}
               disabled={isAnalyzing || !contractId}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-[13px] font-bold shadow-md transition-all ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer ${
                 isAnalyzing
                   ? "bg-slate-100 text-slate-400 cursor-not-allowed shadow-none"
                   : hasUnsavedChanges
-                    ? "bg-[#3b5fe5] hover:bg-[#2a4ac2] text-white shadow-[0_4px_14px_rgba(59,95,229,0.3)]"
+                    ? "bg-[#3B5FE5] hover:bg-[#2A4AC2] text-white shadow-[0_4px_14px_rgba(59,95,229,0.3)]"
                     : "bg-[#0B1437] hover:bg-[#152458] text-white"
               }`}
             >
               {isAnalyzing ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" /> Saving...
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> Analyzing...
                 </>
               ) : (
                 <>
-                  <Save className="w-4 h-4" /> Save & Analyze
+                  <Sparkles className="w-3.5 h-3.5 text-blue-300" /> Save & Re-analyze
                 </>
               )}
             </button>
           </div>
         </div>
 
-        {/* Interactive Editor */}
-        <div className="flex-1 overflow-y-auto px-16 py-12 relative bg-white custom-scrollbar">
+        {/* Interactive Editor Area */}
+        <div className="flex-1 overflow-y-auto px-12 py-10 relative bg-white custom-scrollbar">
           {!contractId ? (
             <div className="h-full flex flex-col items-center justify-center text-center p-10">
-              <FileText className="w-16 h-16 text-slate-100 mb-6" />
+              <FileText className="w-16 h-16 text-slate-200 mb-6" />
               <h3 className="text-[20px] font-bold text-slate-900 mb-2">
                 No Document Loaded
               </h3>
               <p className="text-slate-500 text-[14px] max-w-sm">
                 Please select a contract from your repository to view and
-                analyze its content.
+                edit its content.
               </p>
             </div>
           ) : (
-            <div className="max-w-[750px] mx-auto space-y-12">
+            <div className="max-w-[780px] mx-auto space-y-12">
+              <div className="text-xs text-slate-400 bg-slate-50 border border-slate-200/80 rounded-xl px-4 py-2.5 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-blue-500" />
+                  <strong>Tip:</strong> Highlight any text to edit and redraft with AI.
+                </span>
+                <span className="text-[11px] text-slate-500 font-mono">
+                  {htmlContent ? "Ready for editing" : "Loading..."}
+                </span>
+              </div>
+
               <DocumentEditor
                 contract={contract}
                 htmlContent={htmlContent}
                 onInput={handleContentChange}
+                onMouseUp={handleEditorMouseUp}
               />
               <div className="h-40"></div>
             </div>
           )}
-
-          {!isChatOpen && (
-            <button
-              onClick={() => setIsChatOpen(true)}
-              className="fixed bottom-10 right-[31%] xl:right-[35%] bg-black text-white px-6 py-4.5 rounded-xl flex items-center gap-3 shadow-[0_12px_40px_rgba(0,0,0,0.2)] hover:scale-105 transition-transform z-10 group border border-white/10 h-14"
-            >
-              <div className="w-6 h-6 rounded bg-green-500 flex items-center justify-center shrink-0 group-hover:bg-green-400 transition-colors">
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  className="w-3.5 h-3.5 text-black"
-                >
-                  <path
-                    d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </div>
-              <span className="font-bold text-[14px]">Ask AI Jurist</span>
-            </button>
-          )}
         </div>
       </div>
 
-      {isChatOpen ? (
-        /* AI Assistant Right Panel */
-        <div className="flex-1 min-w-[380px] max-w-[450px] h-full bg-gradient-to-b from-[#F4F7FB] to-[#EEF3FB] shadow-[-10px_0_30px_rgba(0,0,0,0.02)] relative animate-in slide-in-from-right duration-300 border-l border-slate-200/60 flex flex-col">
-          <div className="px-6 pt-6 pb-4 border-b border-slate-200/70 bg-white/70 backdrop-blur-xl shrink-0">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-[#0B1437] flex items-center justify-center shrink-0 shadow-[0_8px_20px_rgba(11,20,55,0.2)]">
-                <Bot
-                  className="w-[22px] h-[22px] text-white"
-                  strokeWidth={2.5}
-                />
-              </div>
-              <div>
-                <h3 className="font-extrabold text-[18px] text-slate-900 tracking-tight leading-none mb-1">
-                  AI Assistant
-                </h3>
-                <span className="text-[10px] font-bold tracking-[0.15em] text-[#3B5FE5] uppercase inline-flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                  Analysis Active
-                </span>
-              </div>
-              <div className="ml-auto flex items-center gap-2">
-                <span className="px-2.5 py-1 rounded-full bg-white border border-slate-200 text-[10px] font-semibold text-slate-500">
-                  {qaHistory.length} turns
-                </span>
-                <button
-                  onClick={() => setIsChatOpen(false)}
-                  className="w-10 h-10 rounded-full bg-slate-200/50 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="px-6 pt-4 pb-5 flex-1 min-h-0 flex flex-col gap-3">
-            <div className="flex items-center justify-between px-1">
-              <span className="text-[11px] font-bold tracking-[0.14em] uppercase text-slate-500">
-                Chat
+      {/* Right Sidebar: Tabbed Navigation for Analysis Suggestions & Jurist Chat */}
+      <div className="flex-1 min-w-[390px] max-w-[460px] bg-[#F4F7FB] overflow-hidden h-full flex flex-col shadow-[-10px_0_30px_rgba(0,0,0,0.02)] border-l border-slate-200">
+        {/* Tab Headers */}
+        <div className="flex items-center border-b border-slate-200 bg-white px-6 pt-3 shrink-0 gap-2">
+          <button
+            type="button"
+            onClick={() => setRightPanelTab("analysis")}
+            className={`flex items-center gap-2 pb-3 px-3 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+              rightPanelTab === "analysis"
+                ? "border-[#3B5FE5] text-[#3B5FE5]"
+                : "border-transparent text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            <ShieldAlert className="w-4 h-4" />
+            <span>Risk & Edit Suggestions</span>
+            {analysis?.clauses && analysis.clauses.length > 0 && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] bg-blue-100 text-blue-700 font-bold">
+                {analysis.clauses.length}
               </span>
-              <button
-                type="button"
-                onClick={() => setQaInput("")}
-                className="text-[10px] font-semibold text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                Clear Input
-              </button>
-            </div>
+            )}
+          </button>
 
-            <div
-              ref={qaThreadRef}
-              className={`flex-1 min-h-0 custom-scrollbar px-1 ${qaHistory.length > 0 ? "overflow-y-auto space-y-6" : "overflow-hidden"}`}
-            >
-              {qaHistory.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center px-5">
-                  <div className="w-12 h-12 rounded-2xl bg-white shadow-sm border border-slate-200 flex items-center justify-center mb-4">
-                    <Bot className="w-6 h-6 text-[#3B5FE5]" />
-                  </div>
-                  <h4 className="text-[15px] font-bold text-slate-800 mb-1.5">
-                    How can I help you?
-                  </h4>
-                  <p className="text-[12px] text-slate-500 mb-8 max-w-[260px] leading-relaxed">
-                    Ask questions about clauses, request rewrites, or clarify legal terminology.
-                  </p>
-                  <div className="flex flex-col gap-2 w-full max-w-[320px]">
-                    {quickPrompts.map((prompt) => (
-                      <button
-                        key={prompt}
-                        type="button"
-                        onClick={() => handleApplyQuickPrompt(prompt)}
-                        className="w-full px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-[#3B5FE5]/30 hover:bg-blue-50/50 text-[11px] font-medium text-slate-600 transition-all text-left shadow-sm flex items-center justify-between group"
-                      >
-                        <span className="truncate pr-2">{prompt}</span>
-                        <div className="w-5 h-5 rounded-md bg-slate-100 flex items-center justify-center group-hover:bg-[#3B5FE5] group-hover:text-white transition-colors shrink-0">
-                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-5 pb-2">
-                  {qaHistory.map((item) => (
-                    <React.Fragment key={item.id}>
-                      <div className="flex justify-end pl-10">
-                        <div className="bg-[#0B1437] text-white rounded-2xl rounded-tr-sm px-4 py-3 shadow-sm border border-[#1C2B62]">
-                          <p className="text-[13px] leading-relaxed whitespace-pre-wrap">
-                            {item.question}
-                          </p>
-                        </div>
-                      </div>
+          <button
+            type="button"
+            onClick={() => setRightPanelTab("chat")}
+            className={`flex items-center gap-2 pb-3 px-3 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+              rightPanelTab === "chat"
+                ? "border-[#3B5FE5] text-[#3B5FE5]"
+                : "border-transparent text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            <Bot className="w-4 h-4" />
+            <span>Ask AI Jurist</span>
+            {qaHistory.length > 0 && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] bg-slate-100 text-slate-600 font-bold">
+                {qaHistory.length}
+              </span>
+            )}
+          </button>
+        </div>
 
-                      <div className="flex justify-start pr-4">
-                        <div className="flex gap-3 w-full">
-                          <div className="w-7 h-7 rounded-full bg-white border border-slate-200 flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
-                            <Bot className="w-4 h-4 text-[#3B5FE5]" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            {item.isPending ? (
-                              <div className="flex items-center gap-2 text-[13px] text-slate-500 h-8">
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                <span>Drafting answer...</span>
-                              </div>
-                            ) : (
-                              <div
-                                className={`contract-markdown markdown-body max-w-none text-[13px] leading-relaxed bg-white rounded-2xl rounded-tl-sm px-4 py-3.5 border border-slate-200 shadow-sm ${item.isError ? "text-red-600" : "text-slate-700"}`}
-                                dangerouslySetInnerHTML={{
-                                  __html: item.answerHtml,
-                                }}
-                              />
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </React.Fragment>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="shrink-0 flex flex-col gap-3 mt-2">
-              {qaHistory.length > 0 && (
-                <div className="flex flex-wrap gap-2 px-1">
-                  {quickPrompts.map((prompt) => (
-                    <button
-                      key={prompt}
-                      type="button"
-                      onClick={() => handleApplyQuickPrompt(prompt)}
-                      className="px-3 py-1.5 rounded-full bg-white border border-slate-200 hover:border-[#3B5FE5]/30 hover:bg-blue-50/50 text-[10px] font-medium text-slate-600 transition-colors shadow-sm"
-                    >
-                      {prompt}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden focus-within:ring-2 focus-within:ring-[#3B5FE5] transition-all">
-              <textarea
-                ref={qaInputRef}
-                placeholder="Ask for edits, risk interpretation, or fallback language..."
-                value={qaInput}
-                onChange={(e) => setQaInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleAskQuestion();
-                  }
-                }}
-                className="w-full h-[104px] resize-none outline-none text-[13px] text-slate-800 placeholder:text-slate-400 font-medium leading-[1.7] bg-transparent p-5 custom-scrollbar"
-              />
-              <div className="flex items-center justify-between px-4 pb-4">
-                <span className="text-[10px] text-slate-400 font-medium">
-                  Enter to send, Shift+Enter for newline
+        {/* Tab 1: Analysis & Suggestions */}
+        {rightPanelTab === "analysis" && (
+          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6 custom-scrollbar">
+            {/* Risk Score Summary Card */}
+            <div className="bg-[#0B1437] rounded-2xl p-6 text-white shadow-xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-[60px] pointer-events-none"></div>
+              <div className="relative z-10 flex items-start justify-between mb-4">
+                <span className="text-[10px] font-bold tracking-[0.15em] uppercase text-white/80">
+                  {isAnalyzing ? "ANALYZING..." : "CONTRACT RISK PROFILE"}
                 </span>
-                <button
-                  onClick={handleAskQuestion}
-                  disabled={!contractId || qaLoading || !qaInput.trim()}
-                  className="h-10 px-4 rounded-xl bg-[#0B1437] hover:bg-[#152458] disabled:bg-slate-200 disabled:text-slate-400 text-white flex items-center justify-center gap-2 transition-colors text-[12px] font-semibold"
-                >
-                  {qaLoading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Sending
-                    </>
-                  ) : (
-                    <>
-                      <Send className="w-4 h-4" strokeWidth={2.5} />
-                      Send
-                    </>
-                  )}
-                </button>
+                <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-white/10 text-white border border-white/10">
+                  {analysis?.overall_risk_score > 60
+                    ? "High Exposure"
+                    : analysis?.overall_risk_score > 30
+                      ? "Moderate Exposure"
+                      : "Low Risk"}
+                </span>
               </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : isTemplateGenerationView || showMockGenerated ? (
-        <div className="flex-1 min-w-[380px] max-w-[450px] bg-[#F4F7FB] overflow-y-auto h-full px-8 py-10 space-y-6 custom-scrollbar shadow-[-10px_0_30px_rgba(0,0,0,0.02)] animate-in slide-in-from-right duration-300">
-          <div className="bg-white rounded-[24px] p-8 border border-slate-200 shadow-sm">
-            <h3 className="text-[11px] font-bold tracking-[0.15em] uppercase text-slate-500 mb-4">
-              Template Draft Mode
-            </h3>
-            <p className="text-[13px] text-slate-700 leading-relaxed">
-              This contract was generated from templates. Risk score and
-              clause-level analysis are intentionally hidden in this mode.
-            </p>
-          </div>
 
-          <div className="bg-white rounded-[24px] p-6 border border-slate-200 shadow-sm space-y-3">
-            <h4 className="text-[11px] font-bold tracking-[0.14em] uppercase text-slate-500">
-              Suggested Next Step
-            </h4>
-            <p className="text-[12px] text-slate-600 leading-relaxed">
-              Use the AI Assistant to refine clauses and language. Once saved
-              and analyzed as a tracked contract, risk metrics will appear in
-              the analysis view.
-            </p>
-          </div>
-        </div>
-      ) : (analysis?.overall_risk_score > 0 || (analysis?.clauses && analysis?.clauses.length > 0)) ? (
-        /* Analysis Sidebar Right Panel */
-        <div className="flex-1 min-w-[380px] max-w-[450px] bg-[#F4F7FB] overflow-y-auto h-full px-8 py-10 space-y-12 custom-scrollbar shadow-[-10px_0_30px_rgba(0,0,0,0.02)] animate-in slide-in-from-right duration-300">
-          <div className="bg-[#0B1437] rounded-[24px] p-8 pb-10 text-white shadow-xl relative overflow-hidden group transition-all">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-[60px] -translate-y-1/2 translate-x-1/3 pointer-events-none"></div>
-            <div className="relative z-10 flex items-start justify-between mb-8">
-              <h3 className="text-[10px] font-bold tracking-[0.15em] uppercase text-white/90 w-2/3 leading-relaxed flex items-center gap-2">
-                {isAnalyzing ? (
-                  <span className="flex items-center gap-2 text-blue-300">
-                    <Loader2 className="w-3 h-3 animate-spin" /> ANALYZING...
-                  </span>
-                ) : hasUnsavedChanges ? (
-                  <span className="flex items-center gap-2 text-amber-300">
-                    <AlertTriangle className="w-3 h-3" /> UNSAVED EDITS
-                  </span>
-                ) : (
-                  "Contract Risk Score"
-                )}
-              </h3>
-              <div className="flex items-center gap-2">
-                <Info className="w-[18px] h-[18px] text-white/40 cursor-pointer hover:text-white transition-colors" />
-              </div>
-            </div>
-
-            <div
-              className={`relative z-10 transition-opacity duration-300 ${isAnalyzing ? "opacity-30 blur-[2px]" : hasUnsavedChanges ? "opacity-60" : "opacity-100"}`}
-            >
-              <div className="flex items-baseline gap-2 mb-8">
-                <span className="text-[64px] font-bold tracking-tighter leading-none">
+              <div className="flex items-baseline gap-2 mb-4">
+                <span className="text-5xl font-bold tracking-tight">
                   {analysis?.overall_risk_score || 0}
                 </span>
-                <span className="text-[15px] font-medium text-white/50 mb-2">
-                  / 100
-                </span>
+                <span className="text-sm font-medium text-white/50">/ 100</span>
               </div>
-              <div className="w-full h-1.5 bg-white/10 rounded-full mb-8 overflow-hidden">
+
+              <div className="w-full h-1.5 bg-white/10 rounded-full mb-6 overflow-hidden">
                 <div
-                  className={`h-full rounded-full transition-all duration-[2000ms] ease-in-out ${
+                  className={`h-full rounded-full transition-all duration-1000 ${
                     (analysis?.overall_risk_score || 0) > 70
                       ? "bg-red-400"
                       : (analysis?.overall_risk_score || 0) > 40
@@ -873,124 +868,287 @@ export default function TenantFilesPage() {
                 ></div>
               </div>
 
-              {/* Visual Issue Grid */}
-              <div className="grid grid-cols-2 gap-3 mb-8">
-                <div className="bg-white/5 rounded-xl p-3 border border-white/5">
-                  <span className="block text-[10px] font-bold text-white/40 uppercase mb-1">
+              {/* Counts Grid */}
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="bg-white/5 rounded-xl p-2.5 border border-white/5">
+                  <span className="block text-[10px] font-bold text-white/40 uppercase">
                     Critical / High
                   </span>
-                  <span className="text-[18px] font-bold text-red-300">
-                    {(analysis?.critical_issues || 0) +
-                      (analysis?.high_issues || 0)}
+                  <span className="text-base font-bold text-red-300">
+                    {(analysis?.critical_issues || 0) + (analysis?.high_issues || 0)}
                   </span>
                 </div>
-                <div className="bg-white/5 rounded-xl p-3 border border-white/5">
-                  <span className="block text-[10px] font-bold text-white/40 uppercase mb-1">
+                <div className="bg-white/5 rounded-xl p-2.5 border border-white/5">
+                  <span className="block text-[10px] font-bold text-white/40 uppercase">
                     Medium / Low
                   </span>
-                  <span className="text-[18px] font-bold text-blue-200">
-                    {(analysis?.medium_issues || 0) +
-                      (analysis?.low_issues || 0)}
+                  <span className="text-base font-bold text-blue-200">
+                    {(analysis?.medium_issues || 0) + (analysis?.low_issues || 0)}
                   </span>
                 </div>
               </div>
+            </div>
 
-              <p className="text-[12px] text-white/70 leading-[1.6] font-medium w-[90%]">
-                {analysis?.overall_risk_score > 60
-                  ? "DeepAgents flagged this as high risk. Multiple unfavorable clauses identified requiring negotiation."
-                  : "Risk profile appears manageable. Primarily standard market terms detected."}
-              </p>
+            {/* Recommended Actions */}
+            {analysis?.recommended_actions && analysis.recommended_actions.length > 0 && (
+              <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-3">
+                <h4 className="text-[11px] font-bold tracking-wider uppercase text-slate-500 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                  Recommended Next Steps
+                </h4>
+                <ul className="space-y-2 text-xs text-slate-700">
+                  {analysis.recommended_actions.map((act: string, i: number) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600 mt-1.5 shrink-0"></span>
+                      <span>{act}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Clause Analysis & Suggestions List */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-[11px] font-bold tracking-wider uppercase text-slate-500">
+                  Identified Clauses & Edit Suggestions
+                </h4>
+                <span className="text-[10px] text-slate-400 font-semibold">
+                  {analysis?.clauses?.length || 0} clauses
+                </span>
+              </div>
+
+              {(!analysis?.clauses || analysis.clauses.length === 0) ? (
+                <div className="bg-white rounded-2xl p-6 border border-slate-200 text-center text-xs text-slate-500">
+                  No clause breakdown available yet. Click &quot;Save & Re-analyze&quot; to run analysis.
+                </div>
+              ) : (
+                analysis.clauses.map((clause: any, i: number) => {
+                  const isExpanded = expandedClauses.has(i);
+
+                  return (
+                    <div
+                      key={i}
+                      className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/90 hover:border-blue-300 transition-all space-y-3"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-start gap-2.5">
+                          <div
+                            className={`w-7 h-7 rounded-lg ${
+                              clause.severity === "critical" || clause.severity === "high"
+                                ? "bg-red-50 text-red-600"
+                                : "bg-emerald-50 text-emerald-600"
+                            } flex items-center justify-center shrink-0 mt-0.5`}
+                          >
+                            {clause.severity === "critical" || clause.severity === "high" ? (
+                              <AlertTriangle className="w-4 h-4" />
+                            ) : (
+                              <CheckCircle2 className="w-4 h-4" />
+                            )}
+                          </div>
+                          <div>
+                            <h5 className="font-bold text-xs text-slate-900 capitalize">
+                              {clause.section_title || clause.clause_type?.replaceAll("_", " ")}
+                            </h5>
+                            <span
+                              className={`inline-block mt-1 px-2 py-0.5 ${getSeverityBg(clause.severity)} ${getSeverityColor(clause.severity)} rounded text-[9px] font-bold tracking-wider uppercase`}
+                            >
+                              {clause.severity}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Action: Open AI Redraft Modal */}
+                        <button
+                          type="button"
+                          onClick={() => handleOpenClauseRedraft(clause, i)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold transition border border-blue-200/60 shrink-0 cursor-pointer"
+                        >
+                          <Wand2 className="w-3.5 h-3.5 text-blue-600" />
+                          <span>AI Fix</span>
+                        </button>
+                      </div>
+
+                      {/* Risk snippet */}
+                      <p className="text-xs text-slate-600 leading-relaxed">
+                        {clause.risk_description || clause.raw_text}
+                      </p>
+
+                      {/* Expandable details */}
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                        <button
+                          type="button"
+                          onClick={() => toggleClause(i)}
+                          className="text-slate-500 hover:text-slate-800 font-semibold flex items-center gap-1"
+                        >
+                          <span>{isExpanded ? "Hide Details" : "Legal Grounding"}</span>
+                          {isExpanded ? (
+                            <ChevronUp className="w-3 h-3" />
+                          ) : (
+                            <ChevronDown className="w-3 h-3" />
+                          )}
+                        </button>
+
+                        <span className="text-slate-400 text-[10px]">
+                          {clause.applicable_statute || "Indian Contract Act"}
+                        </span>
+                      </div>
+
+                      {isExpanded && (
+                        <div className="pt-2 space-y-2 text-xs bg-slate-50 p-3 rounded-xl border border-slate-100 animate-in fade-in duration-200">
+                          {clause.legal_reasoning && (
+                            <div>
+                              <span className="font-bold text-slate-700 block mb-0.5">
+                                Reason & Precedents:
+                              </span>
+                              <p className="text-slate-600">{clause.legal_reasoning}</p>
+                            </div>
+                          )}
+                          {clause.statute_section && (
+                            <div className="flex items-center gap-1.5 text-blue-800 font-medium">
+                              <Globe className="w-3 h-3 text-blue-600" />
+                              <span>Section: {clause.statute_section}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
+        )}
 
-          <div className="space-y-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-[11px] font-bold tracking-[0.15em] uppercase text-slate-500">
-                Clauses Analysis
-              </h3>
-              <span className="px-3 py-1.5 bg-[#Edf2FF] text-[#3B5FE5] rounded-md text-[9px] font-bold tracking-widest uppercase">
-                {analysis?.clauses?.length || 0} Detected
-              </span>
-            </div>
-
-            {analysis?.clauses?.map((clause: any, i: number) => {
-              const isExpanded = expandedClauses.has(i);
-
-              return (
-                <div key={i} className="group/clause flex flex-col space-y-4">
-                  <div
-                    onClick={() => toggleClause(i)}
-                    className="bg-white rounded-[16px] p-6 shadow-sm border border-slate-100 hover:border-blue-200 transition-all duration-300 cursor-pointer"
-                  >
-                    <div className="flex gap-4">
-                      <div
-                        className={`w-8 h-8 rounded-full ${clause.severity === "critical" || clause.severity === "high" ? "bg-red-100/50 text-red-500" : "bg-green-100/50 text-green-500"} flex items-center justify-center shrink-0 mt-0.5`}
+        {/* Tab 2: Ask AI Jurist Q&A */}
+        {rightPanelTab === "chat" && (
+          <div className="flex-1 flex flex-col min-h-0 bg-white">
+            {/* Chat Thread */}
+            <div
+              ref={qaThreadRef}
+              className="flex-1 min-h-0 p-5 overflow-y-auto space-y-4 custom-scrollbar"
+            >
+              {qaHistory.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-center p-6">
+                  <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center mb-4">
+                    <Bot className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-800 mb-1">
+                    Ask AI Jurist
+                  </h4>
+                  <p className="text-xs text-slate-500 mb-6 max-w-xs leading-relaxed">
+                    Ask questions grounded in the contract text, request redrafting suggestions, or verify statutory compliance.
+                  </p>
+                  <div className="flex flex-col gap-2 w-full max-w-xs">
+                    {quickPrompts.map((prompt) => (
+                      <button
+                        key={prompt}
+                        type="button"
+                        onClick={() => handleApplyQuickPrompt(prompt)}
+                        className="w-full px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-blue-50 border border-slate-200 text-xs text-left text-slate-700 transition font-medium"
                       >
-                        {clause.severity === "critical" ||
-                        clause.severity === "high" ? (
-                          <AlertTriangle
-                            className="w-4 h-4"
-                            strokeWidth={2.5}
-                          />
-                        ) : (
-                          <CheckCircle2 className="w-4 h-4" strokeWidth={2.5} />
-                        )}
+                        + {prompt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                qaHistory.map((item) => (
+                  <div key={item.id} className="space-y-3">
+                    {/* User message */}
+                    <div className="flex justify-end pl-8">
+                      <div className="bg-[#0B1437] text-white rounded-2xl rounded-tr-sm px-4 py-2.5 text-xs shadow-sm">
+                        {item.question}
                       </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-2.5 gap-2">
-                          <h4 className="font-bold text-[14px] text-slate-900 leading-none capitalize truncate">
-                            {clause.clause_type?.replaceAll("_", " ")}
-                          </h4>
-                          <span
-                            className={`px-2 py-1 ${getSeverityBg(clause.severity)} ${getSeverityColor(clause.severity)} rounded text-[9px] font-bold tracking-widest uppercase shrink-0`}
-                          >
-                            {clause.severity}
-                          </span>
-                        </div>
-                        <p className="text-[12px] text-slate-500 leading-relaxed font-medium line-clamp-1 group-hover/clause:line-clamp-none transition-all">
-                          {clause.risk_description || clause.raw_text}
-                        </p>
+                    </div>
 
-                        {isExpanded && (
-                          <div className="mt-6 pt-5 border-t border-slate-50 space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                  Deep Reasoning
-                                </span>
-                              </div>
-                              <div className="bg-slate-50 rounded-xl p-4">
-                                <p className="text-[12px] text-slate-700 leading-relaxed font-medium whitespace-pre-line">
-                                  {clause.legal_reasoning ||
-                                    "No automated reasoning available for this section."}
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="space-y-2">
-                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                Grounding
-                              </span>
-                              <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg border border-blue-100/50">
-                                <Globe className="w-3.5 h-3.5 text-blue-500" />
-                                <span className="text-[11px] font-bold text-blue-800">
-                                  {clause.applicable_statute ||
-                                    "Indian Contract Act 1872"}{" "}
-                                  / {clause.statute_section}
-                                </span>
-                              </div>
-                            </div>
+                    {/* Agent message */}
+                    <div className="flex justify-start pr-8 gap-2.5">
+                      <div className="w-7 h-7 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center shrink-0 mt-0.5">
+                        <Bot className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        {item.isPending ? (
+                          <div className="flex items-center gap-2 text-xs text-slate-500 py-2">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Retrieving contract chunks & drafting response...</span>
                           </div>
+                        ) : (
+                          <div
+                            className={`contract-markdown markdown-body text-xs bg-slate-50 border border-slate-200 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm ${
+                              item.isError ? "text-red-600" : "text-slate-800"
+                            }`}
+                            dangerouslySetInnerHTML={{ __html: item.answerHtml }}
+                          />
                         )}
                       </div>
                     </div>
                   </div>
+                ))
+              )}
+            </div>
+
+            {/* Chat Input Composer */}
+            <div className="p-4 border-t border-slate-200 bg-slate-50 shrink-0 space-y-2">
+              <div className="bg-white rounded-xl border border-slate-200 overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 transition">
+                <textarea
+                  ref={qaInputRef}
+                  placeholder="Ask a question or request a clause change..."
+                  value={qaInput}
+                  onChange={(e) => setQaInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleAskQuestion();
+                    }
+                  }}
+                  className="w-full h-20 resize-none outline-none text-xs text-slate-800 placeholder:text-slate-400 p-3 bg-transparent"
+                />
+                <div className="flex items-center justify-between px-3 pb-2.5">
+                  <span className="text-[10px] text-slate-400">
+                    Enter to send, Shift+Enter for newline
+                  </span>
+                  <button
+                    onClick={handleAskQuestion}
+                    disabled={!contractId || qaLoading || !qaInput.trim()}
+                    className="h-8 px-3 rounded-lg bg-[#0B1437] hover:bg-[#152458] disabled:bg-slate-200 disabled:text-slate-400 text-white flex items-center justify-center gap-1.5 transition text-xs font-semibold cursor-pointer"
+                  >
+                    {qaLoading ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Send className="w-3.5 h-3.5" />
+                    )}
+                    <span>Send</span>
+                  </button>
                 </div>
-              );
-            })}
+              </div>
+            </div>
           </div>
-        </div>
-      ) : null}
+        )}
+      </div>
+
+      {/* Clause Redline Modal for Suggested Fixes */}
+      {activeClauseForRedraft && (
+        <ClauseRedlineModal
+          contractId={contractId || ""}
+          clause={activeClauseForRedraft}
+          isOpen={!!activeClauseForRedraft}
+          onClose={() => setActiveClauseForRedraft(null)}
+          onRevisionApplied={handleClauseRevisionApplied}
+        />
+      )}
+
+      {/* AI Selection Modal for Highlights */}
+      <AISelectionModal
+        isOpen={isSelectionModalOpen}
+        onClose={() => {
+          setIsSelectionModalOpen(false);
+          setSavedRange(null);
+        }}
+        selectedText={selectedSnippet}
+        contractId={contractId || ""}
+        onApply={handleApplySelectionReplacement}
+      />
     </div>
   );
 }

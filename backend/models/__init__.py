@@ -7,6 +7,7 @@ from backend.database import Base
 from backend.models.documents import Document
 from backend.models.chunk_context import ChunkContext
 from backend.models.entity_mention import EntityMention
+from backend.models.contract_analysis import ContractAnalysis, ContractObligation, ContractRisk, ContractChatMessage
 from backend.models.cases import Case, CaseDocument, CaseDocumentChunk, EvidenceDetail, CaseTimeline, CaseAnalysis, CaseAgentMemory
 
 # Import Chunk model from chunking service
@@ -22,6 +23,10 @@ __all__ = [
     "Document", 
     "ChunkContext", 
     "EntityMention",
+    "ContractAnalysis",
+    "ContractObligation",
+    "ContractRisk",
+    "ContractChatMessage",
     "Case",
     "CaseDocument",
     "CaseDocumentChunk",

@@ -282,3 +282,59 @@ class ContractRisk(Base):
 
     def __repr__(self) -> str:
         return f"ContractRisk(id={self.id}, severity={self.severity})"
+
+
+class ContractChatMessage(Base):
+    """
+    SQLAlchemy model for storing Ask Jurist contract Q&A conversations.
+    """
+    __tablename__ = "contract_chat_messages"
+
+    id: Mapped[str] = mapped_column(
+        String(36),
+        primary_key=True,
+        index=True,
+        default=lambda: str(uuid.uuid4()),
+        unique=True,
+        nullable=False,
+    )
+
+    document_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("documents.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    question: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+
+    answer: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+
+    citations: Mapped[list[dict]] = mapped_column(
+        JSON,
+        default=list,
+        nullable=False,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=datetime.utcnow,
+        nullable=False,
+        index=True,
+    )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "document_id": self.document_id,
+            "question": self.question,
+            "answer": self.answer,
+            "citations": self.citations or [],
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }

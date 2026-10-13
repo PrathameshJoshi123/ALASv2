@@ -5,7 +5,7 @@ Migration script to create the contract_analysis, contract_obligations, and cont
 import logging
 from sqlalchemy import inspect
 from backend.database import engine
-from backend.models.contract_analysis import ContractAnalysis, ContractObligation, ContractRisk
+from backend.models.contract_analysis import ContractAnalysis, ContractObligation, ContractRisk, ContractChatMessage
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -27,6 +27,7 @@ def create_tables_if_not_exist() -> bool:
     ContractAnalysis.__table__.create(bind=engine, checkfirst=True)
     ContractObligation.__table__.create(bind=engine, checkfirst=True)
     ContractRisk.__table__.create(bind=engine, checkfirst=True)
+    ContractChatMessage.__table__.create(bind=engine, checkfirst=True)
 
     is_postgres = engine.dialect.name == "postgresql"
 

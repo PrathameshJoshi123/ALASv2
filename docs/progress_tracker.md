@@ -188,6 +188,14 @@ The `autonomous_legal_advisor` prompt is structured to guide multi-turn investig
 | `backend/skills/{contract-orchestration, document-structure, chunk-context, entity-resolution, clause-analysis, obligation-rights, contract-risk, cross-reference, contract-review}` | **Deleted** | 9 obsolete DeepAgents markdown prompt directories; purged to keep codebase clean. |
 
 
+| `backend/agents/jurist_rag_langgraph.py` | **Created** | Autonomous LangGraph Jurist RAG agent with pre-computed analysis grounding, hybrid chunk retrieval, and Indian Kanoon statutory search. |
+| `backend/services/contract_revision_service.py` | **Created** | Service for AI-driven clause redrafting, custom prompt revision, and Indian Contract Act 1872 statutory compliance. |
+| `backend/routes/contracts.py` | **Modified** | Connected QA endpoint to `run_jurist_rag`; added `POST /{document_id}/redraft-clause` and `POST /{document_id}/apply-revision`. |
+| `frontend/services/api.ts` | **Modified** | Added `redraftClause` and `applyClauseRevision` API client functions. |
+| `frontend/components/dashboard/ClauseRedlineModal.tsx` | **Created** | Interactive modal for side-by-side redline review, custom user edit prompts, bias selection, and revision application. |
+| `frontend/app/dashboard/contracts/[id]/page.tsx` | **Modified** | Integrated "Edit & Redraft Clause" trigger on each analyzed clause card and mounted `ClauseRedlineModal`. |
+| `frontend/components/dashboard/JuristChatDrawer.tsx` | **Modified** | Updated header to indicate Autonomous LangGraph RAG and added statutory quick-prompt shortcuts. |
+
 ---
 
 ## 8. Guidance for Subsequent Developers & Agents
@@ -198,3 +206,20 @@ The `autonomous_legal_advisor` prompt is structured to guide multi-turn investig
    When giving an agent autonomy to invoke tools, place it in a designated node with a conditional edge checking `turn_count < MAX_TURNS` to prevent infinite loops.
 3. **Indian Kanoon Scraper Etiquette**:
    Always reuse the cached functions in `backend/tools/indian_kanoon_tools.py`. Do not write raw scrapers that hammer `indiankanoon.org` without User-Agent headers or caching.
+4. **Analysis Grounding for RAG & Redlining**:
+   Always pass pre-computed `ContractAnalysis` (risk score, flagged clauses, Indian statutory citations) to both `jurist_rag_langgraph.py` and `contract_revision_service.py` so the assistant is context-aware.
+
+---
+
+## 9. Recent Feature Additions (Ask Jurist RAG & Post-Analysis Redlining)
+
+### Ask Jurist Autonomous LangGraph RAG (`backend/agents/jurist_rag_langgraph.py`)
+- Replaced the legacy `deepagents.create_deep_agent` in the QA endpoint with a compiled LangGraph `StateGraph`.
+- **Pre-computed Analysis Grounding**: Reads parties, overall risk score, critical issues, and flagged clauses into the RAG state at intake.
+- **Autonomous Multi-Turn Tool Loop**: The agent can call `hybrid_search_chunks`, `get_surrounding_chunks`, `get_all_document_chunks`, and `search_indian_kanoon` up to `MAX_RETRIEVAL_TURNS = 3`.
+- **Strict Grounding**: Emits structured citations (`chunk_id`, page range, section titles, Indian Kanoon URLs) and anti-hallucination guardrails.
+
+### Post-Analysis Contract Revision & Redlining (`ClauseRedlineModal.tsx` & `contract_revision_service.py`)
+- **Backend Service**: Intelligently redrafts clauses considering original text, analysis risk flags, custom prompt instructions, and bias (Balanced, Client, Counterparty).
+- **Statutory Guardrails**: Automatically remedies non-compete traps under Section 27 ICA and liquidated damage traps under Section 74 ICA.
+- **Frontend Interactive UI**: Added an "Edit & Redraft Clause" button on each analyzed clause card opening a side-by-side comparison modal with live diffs and "Apply Revision to Contract" capability.

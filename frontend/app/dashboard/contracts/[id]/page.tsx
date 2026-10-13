@@ -18,11 +18,14 @@ import {
   BookOpen,
   ExternalLink,
   Scale,
+  Sparkles,
+  Edit3,
 } from "lucide-react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { apiClient } from "@/services/api";
 import { JuristChatDrawer } from "@/components/dashboard/JuristChatDrawer";
+import { ClauseRedlineModal } from "@/components/dashboard/ClauseRedlineModal";
 
 interface Clause {
   id: string;
@@ -52,6 +55,8 @@ export default function ContractDetailsPage() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [agentLogs, setAgentLogs] = useState<any[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [selectedClauseForEdit, setSelectedClauseForEdit] = useState<Clause | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const [selectedObligationCategory, setSelectedObligationCategory] =
     useState<string>("ALL");
@@ -1038,18 +1043,28 @@ export default function ContractDetailsPage() {
                       </p>
                     </div>
 
-                    {/* Action Items */}
-                    <div className="bg-yellow-50 border border-yellow-200 rounded p-4">
-                      <h4 className="font-semibold text-slate-900 mb-2">
-                        Recommended Action
-                      </h4>
-                      <ul className="text-sm text-slate-700 space-y-1">
-                        <li>• Review this clause with your legal team</li>
-                        <li>
-                          • Consider negotiating modifications if high risk
-                        </li>
-                        <li>• Document any approved exceptions</li>
-                      </ul>
+                    {/* Action Items & Edit Trigger */}
+                    <div className="bg-yellow-50 border border-yellow-200 rounded p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <h4 className="font-semibold text-slate-900 mb-1">
+                          Recommended Action
+                        </h4>
+                        <ul className="text-sm text-slate-700 space-y-0.5">
+                          <li>• Review this clause with your legal team</li>
+                          <li>• Consider negotiating modifications if high risk</li>
+                        </ul>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedClauseForEdit(clause);
+                          setIsEditModalOpen(true);
+                        }}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-xs transition shrink-0 self-start sm:self-auto"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                        Edit & Redraft Clause
+                      </button>
                     </div>
                   </div>
                 )}
@@ -1076,6 +1091,26 @@ export default function ContractDetailsPage() {
         isOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
       />
+
+      {/* Post-Analysis Clause Redline & Revision Modal */}
+      {selectedClauseForEdit && (
+        <ClauseRedlineModal
+          contractId={contractId}
+          clause={selectedClauseForEdit}
+          isOpen={isEditModalOpen}
+          onClose={() => {
+            setIsEditModalOpen(false);
+            setSelectedClauseForEdit(null);
+          }}
+          onRevisionApplied={() => {
+            // Trigger contract data refetch to update risk score & clause text
+            apiClient.getContractAnalysis(contractId).then((res) => {
+              setClauses(res.clauses || []);
+              setAnalysis(res);
+            });
+          }}
+        />
+      )}
     </div>
   );
 }

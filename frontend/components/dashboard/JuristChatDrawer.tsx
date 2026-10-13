@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Bot, Loader2, Send, X } from "lucide-react";
+import { Bot, Loader2, Send, X, Maximize2, Minimize2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
@@ -26,6 +26,7 @@ export function JuristChatDrawer({ contractId, isOpen, onClose }: JuristChatDraw
   const [qaInput, setQaInput] = useState("");
   const [qaLoading, setQaLoading] = useState(false);
   const [qaHistory, setQaHistory] = useState<QAItem[]>([]);
+  const [isFullView, setIsFullView] = useState(false);
 
   const qaThreadRef = useRef<HTMLDivElement | null>(null);
   const qaInputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -45,6 +46,64 @@ export function JuristChatDrawer({ contractId, isOpen, onClose }: JuristChatDraw
       return `<p>${escaped}</p>`;
     }
   }, []);
+
+  // Fetch saved chat history from backend database on drawer open
+  useEffect(() => {
+    if (!isOpen || !contractId) return;
+
+    let isMounted = true;
+    apiClient
+      .getContractQAHistory(contractId)
+      .then(async (res) => {
+        if (!isMounted || !res?.history || !Array.isArray(res.history)) return;
+
+        const parsedItems: QAItem[] = await Promise.all(
+          res.history.map(async (msg: any) => {
+            let answerText = msg.answer || "";
+            if (msg.citations && Array.isArray(msg.citations) && msg.citations.length > 0) {
+              answerText += "\n\n---\n**Citations / References:**\n";
+              msg.citations.forEach((c: any, idx: number) => {
+                const pages = c.page_start
+                  ? ` (Page ${c.page_start}${c.page_end && c.page_end !== c.page_start ? `-${c.page_end}` : ""})`
+                  : "";
+                const quote = c.content ? `\n> "${c.content}"` : "";
+                answerText += `\n${idx + 1}. **Chunk ${c.chunk_id || idx + 1}**${pages}${quote}`;
+              });
+            }
+            const answerHtml = await renderMarkdownToHtml(answerText);
+            return {
+              id: msg.id || `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+              question: msg.question,
+              answer: answerText,
+              answerHtml,
+              isPending: false,
+              isError: false,
+            };
+          }),
+        );
+
+        if (parsedItems.length > 0) {
+          setQaHistory(parsedItems);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen, contractId, renderMarkdownToHtml]);
+
+  const handleClearThread = async () => {
+    if (!contractId) return;
+    try {
+      await apiClient.clearContractQAHistory(contractId);
+      setQaHistory([]);
+      toast.success("Chat history cleared from database.");
+    } catch {
+      setQaHistory([]);
+    }
+  };
+
 
   const handleAskQuestion = async (overridePrompt?: string) => {
     const question = (overridePrompt || qaInput).trim();
@@ -138,62 +197,91 @@ export function JuristChatDrawer({ contractId, isOpen, onClose }: JuristChatDraw
   }, [qaHistory, qaLoading, isOpen]);
 
   const quickPrompts = [
-    "Summarize top 3 negotiation priorities in plain language.",
-    "Flag hidden termination and auto-renewal risks.",
-    "What are the main liability caps and indemnities?",
+    "Summarize top negotiation priorities and statutory risks.",
+    "Are non-compete and restraint of trade clauses valid under Section 27 ICA?",
+    "What are the main liability caps, liquidated damages, and indemnities?",
   ];
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-y-0 right-0 z-50 w-full max-w-[440px] bg-gradient-to-b from-[#F4F7FB] to-[#EEF3FB] shadow-[-10px_0_30px_rgba(0,0,0,0.15)] border-l border-slate-200/80 flex flex-col animate-in slide-in-from-right duration-300">
-      {/* Header */}
-      <div className="px-6 pt-6 pb-4 border-b border-slate-200/70 bg-white/80 backdrop-blur-xl shrink-0">
-        <div className="flex items-center gap-4">
-          <div className="w-11 h-11 rounded-xl bg-[#0B1437] flex items-center justify-center shrink-0 shadow-[0_8px_20px_rgba(11,20,55,0.2)]">
-            <Bot className="w-5 h-5 text-blue-400" strokeWidth={2.5} />
-          </div>
-          <div>
-            <h3 className="font-extrabold text-[17px] text-slate-900 tracking-tight leading-none mb-1">
-              Jurist AI Assistant
-            </h3>
-            <span className="text-[10px] font-bold tracking-[0.15em] text-[#3B5FE5] uppercase inline-flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-              Ministral 14B QA Active
-            </span>
-          </div>
-          <div className="ml-auto flex items-center gap-2">
-            {qaHistory.length > 0 && (
-              <span className="px-2.5 py-1 rounded-full bg-slate-100 border border-slate-200 text-[10px] font-semibold text-slate-500">
-                {qaHistory.length} turns
-              </span>
-            )}
-            <button
-              onClick={onClose}
-              className="w-9 h-9 rounded-full bg-slate-200/60 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </div>
+    <>
+      {/* Backdrop when in Full View Modal mode */}
+      {isFullView && (
+        <div
+          onClick={() => setIsFullView(false)}
+          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200"
+        />
+      )}
 
-      {/* Main Body */}
-      <div className="px-5 pt-4 pb-5 flex-1 min-h-0 flex flex-col gap-3">
-        <div className="flex items-center justify-between px-1">
-          <span className="text-[11px] font-bold tracking-[0.14em] uppercase text-slate-500">
-            Contract Q&A Thread
-          </span>
-          {qaHistory.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setQaHistory([])}
-              className="text-[10px] font-semibold text-slate-400 hover:text-slate-600 transition-colors"
-            >
-              Clear Thread
-            </button>
-          )}
+      <div
+        className={
+          isFullView
+            ? "fixed inset-4 sm:inset-10 lg:inset-16 z-50 bg-gradient-to-b from-[#F4F7FB] to-[#EEF3FB] shadow-2xl rounded-2xl border border-slate-300 flex flex-col animate-in zoom-in-95 duration-200 overflow-hidden"
+            : "fixed inset-y-0 right-0 z-50 w-full max-w-[440px] bg-gradient-to-b from-[#F4F7FB] to-[#EEF3FB] shadow-[-10px_0_30px_rgba(0,0,0,0.15)] border-l border-slate-200/80 flex flex-col animate-in slide-in-from-right duration-300"
+        }
+      >
+        {/* Header */}
+        <div className="px-6 pt-5 pb-4 border-b border-slate-200/70 bg-white/80 backdrop-blur-xl shrink-0">
+          <div className="flex items-center gap-4">
+            <div className="w-11 h-11 rounded-xl bg-[#0B1437] flex items-center justify-center shrink-0 shadow-[0_8px_20px_rgba(11,20,55,0.2)]">
+              <Bot className="w-5 h-5 text-blue-400" strokeWidth={2.5} />
+            </div>
+            <div>
+              <h3 className="font-extrabold text-[17px] text-slate-900 tracking-tight leading-none mb-1">
+                Jurist AI Assistant
+              </h3>
+              <span className="text-[10px] font-bold tracking-[0.15em] text-[#3B5FE5] uppercase inline-flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                Autonomous LangGraph RAG
+              </span>
+            </div>
+            <div className="ml-auto flex items-center gap-2">
+              {qaHistory.length > 0 && (
+                <span className="px-2.5 py-1 rounded-full bg-slate-100 border border-slate-200 text-[10px] font-semibold text-slate-500">
+                  {qaHistory.length} turns
+                </span>
+              )}
+              {/* Full View Big Modal Toggle */}
+              <button
+                type="button"
+                onClick={() => setIsFullView(!isFullView)}
+                title={isFullView ? "Exit Full View" : "Open in Full View Modal"}
+                className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors"
+              >
+                {isFullView ? (
+                  <Minimize2 className="w-4 h-4" />
+                ) : (
+                  <Maximize2 className="w-4 h-4" />
+                )}
+              </button>
+              <button
+                onClick={onClose}
+                className="w-9 h-9 rounded-full bg-slate-200/60 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
         </div>
+
+        {/* Main Body */}
+        <div className="px-5 pt-4 pb-5 flex-1 min-h-0 flex flex-col gap-3">
+          <div className="flex items-center justify-between px-1">
+            <span className="text-[11px] font-bold tracking-[0.14em] uppercase text-slate-500">
+              Contract Q&A Thread
+            </span>
+            {qaHistory.length > 0 && (
+              <button
+                type="button"
+                onClick={handleClearThread}
+                className="text-[10px] font-semibold text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                Clear Thread
+              </button>
+            )}
+          </div>
+
 
         <div
           ref={qaThreadRef}
@@ -319,6 +407,9 @@ export function JuristChatDrawer({ contractId, isOpen, onClose }: JuristChatDraw
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
+
+
