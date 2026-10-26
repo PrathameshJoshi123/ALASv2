@@ -4,12 +4,15 @@ SQLAlchemy models for storing structured contract analysis results, obligations,
 
 import uuid
 from datetime import datetime
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
-from sqlalchemy import String, DateTime, Boolean, Float, ForeignKey, JSON, Text
+from sqlalchemy import String, DateTime, Boolean, Float, Integer, ForeignKey, JSON, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.database import Base
+
+if TYPE_CHECKING:
+    from backend.models.documents import Document
 
 
 class ContractAnalysis(Base):
@@ -134,6 +137,18 @@ class ContractAnalysis(Base):
     )
 
     # Relationships
+    document: Mapped["Document"] = relationship(
+        "Document",
+        back_populates="analysis",
+    )
+
+    clauses_rel: Mapped[list["ContractClause"]] = relationship(
+        "ContractClause",
+        back_populates="analysis",
+        cascade="all, delete-orphan",
+        order_by="ContractClause.clause_number",
+    )
+
     obligations: Mapped[list["ContractObligation"]] = relationship(
         "ContractObligation",
         back_populates="analysis",
@@ -282,6 +297,138 @@ class ContractRisk(Base):
 
     def __repr__(self) -> str:
         return f"ContractRisk(id={self.id}, severity={self.severity})"
+
+
+class ContractClause(Base):
+    """
+    SQLAlchemy model for storing structured, parsed, and analyzed contract clauses.
+    Enables relational querying, severity indexing, and clause-level redrafting history.
+    """
+    __tablename__ = "contract_clauses"
+
+    id: Mapped[str] = mapped_column(
+        String(36),
+        primary_key=True,
+        index=True,
+        default=lambda: str(uuid.uuid4()),
+        unique=True,
+        nullable=False,
+    )
+
+    analysis_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("contract_analysis.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    document_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("documents.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    clause_number: Mapped[int] = mapped_column(
+        Integer,
+        default=1,
+        nullable=False,
+    )
+
+    clause_type: Mapped[str] = mapped_column(
+        String(100),
+        default="General",
+        nullable=False,
+    )
+
+    section_title: Mapped[str] = mapped_column(
+        String(255),
+        default="Clause",
+        nullable=False,
+    )
+
+    raw_text: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+
+    original_raw_text: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    severity: Mapped[str] = mapped_column(
+        String(50),
+        default="LOW",  # CRITICAL, HIGH, MEDIUM, LOW, INFO, REVISED_SAFE
+        nullable=False,
+        index=True,
+    )
+
+    risk_description: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    legal_reasoning: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    confidence_score: Mapped[float] = mapped_column(
+        Float,
+        default=0.85,
+        nullable=False,
+    )
+
+    is_revised: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+    )
+
+    revision_rationale: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    revised_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=datetime.utcnow,
+        nullable=False,
+    )
+
+    analysis: Mapped["ContractAnalysis"] = relationship(
+        "ContractAnalysis",
+        back_populates="clauses_rel",
+    )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "analysis_id": self.analysis_id,
+            "document_id": self.document_id,
+            "clause_number": self.clause_number,
+            "clause_type": self.clause_type,
+            "section_title": self.section_title,
+            "raw_text": self.raw_text,
+            "original_raw_text": self.original_raw_text,
+            "severity": self.severity,
+            "risk_description": self.risk_description or "",
+            "legal_reasoning": self.legal_reasoning or "",
+            "confidence_score": float(self.confidence_score) if self.confidence_score is not None else 0.85,
+            "is_revised": bool(self.is_revised),
+            "revision_rationale": self.revision_rationale or "",
+            "revised_at": self.revised_at.isoformat() if self.revised_at else None,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+    def __repr__(self) -> str:
+        return f"ContractClause(id={self.id}, num={self.clause_number}, title={self.section_title}, severity={self.severity})"
 
 
 class ContractChatMessage(Base):

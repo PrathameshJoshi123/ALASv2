@@ -97,6 +97,7 @@ def search_via_kanoon_route(query: str, max_results: int = 5) -> List[Dict[str, 
                     "title": title,
                     "url": f"https://indiankanoon.org/doc/{doc_id}/",
                     "snippet": snippet,
+                    "source": "Indian Kanoon Direct",
                 })
                 if len(results) >= max_results:
                     break
@@ -105,30 +106,51 @@ def search_via_kanoon_route(query: str, max_results: int = 5) -> List[Dict[str, 
     return results
 
 
-def search_via_ddgs(query: str, max_results: int = 5) -> List[Dict[str, Any]]:
+def search_via_ddgs(query: str, max_results: int = 4) -> List[Dict[str, Any]]:
     """
-    Search using DDGS with backend='yahoo' (the only responsive search engine backend in ddgs).
-    Filters results for indiankanoon.org documents.
+    Search using DDGS with backend='yahoo' targeting Indian Kanoon documents.
+    Tries site:indiankanoon.org query first, then natural 'indian kanoon <query>'.
     """
-    results = []
+    results: List[Dict[str, Any]] = []
     try:
         from ddgs import DDGS
-        clean_query = query.replace("site:indiankanoon.org", "").strip()
-        search_query = f"site:indiankanoon.org {clean_query}"
-        
-        # In ddgs v9.x, yahoo is verified as active; auto/all hits blocking engines
-        with DDGS(timeout=8) as ddgs:
-            raw_results = list(ddgs.text(search_query, backend="yahoo", max_results=max_results))
-            for item in raw_results:
-                href = item.get("href", "")
-                doc_id = extract_doc_id(href)
-                if doc_id:
-                    results.append({
-                        "doc_id": doc_id,
-                        "title": item.get("title", "").replace(" - Indian Kanoon", "").strip(),
-                        "url": f"https://indiankanoon.org/doc/{doc_id}/",
-                        "snippet": item.get("body", "").strip(),
-                    })
+        clean_query = query.replace("site:indiankanoon.org", "").replace("indian kanoon", "").strip()
+        # Create concise search terms to avoid Yahoo engine over-filtering
+        words = [w for w in re.split(r"\s+", clean_query) if w.isalnum() or "-" in w]
+        concise_query = " ".join(words[:6]) if len(words) > 6 else clean_query
+
+        candidates = [
+            f"site:indiankanoon.org {concise_query}",
+            f"indian kanoon {concise_query}",
+            f"site:indiankanoon.org {clean_query}",
+        ]
+
+        raw_results: List[Dict[str, Any]] = []
+        with DDGS(timeout=10) as ddgs:
+            for cand in candidates:
+                try:
+                    res = list(ddgs.text(cand, backend="yahoo", max_results=max_results * 2))
+                    if res:
+                        raw_results = res
+                        break
+                except Exception:
+                    continue
+
+        seen_ids = set()
+        for item in raw_results:
+            href = item.get("href", "")
+            doc_id = extract_doc_id(href)
+            if doc_id and doc_id not in seen_ids:
+                seen_ids.add(doc_id)
+                results.append({
+                    "doc_id": doc_id,
+                    "title": item.get("title", "").replace(" - Indian Kanoon", "").strip(),
+                    "url": f"https://indiankanoon.org/doc/{doc_id}/",
+                    "snippet": item.get("body", "").strip(),
+                    "source": "Yahoo Legal Index (DDGS)",
+                })
+                if len(results) >= max_results:
+                    break
     except Exception as e:
         logger.info(f"DDGS (yahoo) search note for query '{query}': {e}")
     return results
@@ -218,64 +240,75 @@ def scrape_kanoon_doc(doc_id: str) -> str:
         return err_msg
 
 
-@tool
-def search_indian_kanoon(query: str, max_results: int = 4) -> str:
+def search_indian_kanoon_raw(query: str, max_results: int = 4) -> str:
     """
-    Search Indian Kanoon (indiankanoon.org) for Indian laws, statutory sections,
-    and court judgments.
-    
-    Examples of queries:
-    - "Section 27 Indian Contract Act 1872 restraint of trade"
-    - "Section 74 Indian Contract Act liquidated damages penalty"
-    - "Section 28 Indian Contract Act restraint of legal proceedings jurisdiction"
-    - "Kailash Nath Associates vs DDA liquidated damages"
-    - "unilateral appointment of sole arbitrator Perkins Eastman"
-    
-    Args:
-        query: Specific search terms relating to Indian statutes or case law.
-        max_results: Maximum number of search results to return (default: 4).
+    Internal search function executing BOTH direct Indian Kanoon search and
+    Yahoo legal search (via DDGS) concurrently, returning a deduplicated,
+    blended list of legal authorities.
     """
     cache_key = f"{query.strip().lower()}_{max_results}"
     if cache_key in _SEARCH_CACHE:
         results = _SEARCH_CACHE[cache_key]
     else:
-        # Prioritize direct Indian Kanoon search route (fastest, most authoritative)
-        results = search_via_kanoon_route(query, max_results=max_results)
-        # Supplement with DDGS (Yahoo indexed backend) if results are sparse
-        if len(results) < 2:
-            ddgs_results = search_via_ddgs(query, max_results=max_results)
-            seen_ids = {r["doc_id"] for r in results}
-            for dr in ddgs_results:
-                if dr["doc_id"] not in seen_ids:
-                    results.append(dr)
-                    seen_ids.add(dr["doc_id"])
+        # Run both direct Kanoon search and Yahoo (DDGS) search
+        kanoon_results = search_via_kanoon_route(query, max_results=max_results)
+        ddgs_results = search_via_ddgs(query, max_results=max_results)
+
+        # Merge results with Kanoon direct + Yahoo DDGS, deduplicating by doc_id
+        results: List[Dict[str, Any]] = []
+        seen_ids = set()
+
+        for r in kanoon_results:
+            if r["doc_id"] not in seen_ids:
+                seen_ids.add(r["doc_id"])
+                results.append(r)
+
+        for dr in ddgs_results:
+            if dr["doc_id"] not in seen_ids:
+                seen_ids.add(dr["doc_id"])
+                results.append(dr)
+
         _SEARCH_CACHE[cache_key] = results
 
     if not results:
         return f"No Indian Kanoon documents found matching query: '{query}'."
 
     formatted = [f"Found {len(results)} relevant Indian Kanoon documents for query '{query}':\n"]
-    for i, res in enumerate(results[:max_results], 1):
+    for i, res in enumerate(results[:max_results * 2], 1):
         formatted.append(
             f"{i}. **{res['title']}**\n"
             f"   - Doc ID: `{res['doc_id']}`\n"
             f"   - URL: {res['url']}\n"
-            f"   - Snippet: {res['snippet'][:250]}"
+            f"   - Source Engine: {res.get('source', 'Indian Kanoon')}\n"
+            f"   - Excerpt: {res['snippet'][:250]}"
         )
     formatted.append("\nTip: Call `fetch_kanoon_document` with any Doc ID or URL above to inspect the full statutory section or judgment.")
     return "\n".join(formatted)
 
 
 @tool
-def fetch_kanoon_document(doc_id_or_url: str) -> str:
+def search_indian_kanoon(query: str, max_results: int = 4) -> str:
     """
-    Retrieve and read the statutory provisions or judgment text of a document from Indian Kanoon.
-    
-    Args:
-        doc_id_or_url: The Indian Kanoon document ID (e.g. '1431516') or complete Kanoon URL 
-                       (e.g. 'https://indiankanoon.org/doc/1431516/').
+    Search Indian Kanoon (indiankanoon.org) for Indian laws, statutory sections,
+    and court judgments.
     """
+    return search_indian_kanoon_raw(query=query, max_results=max_results)
+
+
+def fetch_kanoon_document_raw(doc_id_or_url: str) -> str:
+    """Internal fetch function returning scraped document text."""
     doc_id = extract_doc_id(doc_id_or_url)
     if not doc_id:
         return f"Invalid Indian Kanoon document ID or URL format: '{doc_id_or_url}'. Expected numeric ID or URL like 'https://indiankanoon.org/doc/1431516/'."
     return scrape_kanoon_doc(doc_id)
+
+
+@tool
+def fetch_kanoon_document(doc_id_or_url: str) -> str:
+    """
+    Retrieve and read the statutory provisions or judgment text of a document from Indian Kanoon.
+    """
+    return fetch_kanoon_document_raw(doc_id_or_url=doc_id_or_url)
+
+
+

@@ -1,162 +1,160 @@
 "use client";
 
 import { useState } from "react";
-import { User, Bell } from "lucide-react";
+import { User, Bell, Shield, Save } from "lucide-react";
 import toast from "react-hot-toast";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState("profile");
   const [loading, setLoading] = useState(false);
-
   const [profileData, setProfileData] = useState({
     name: "Senior Associate",
     email: "associate@lexington.com",
+    firm: "Lexington & Co",
+    jurisdiction: "India (Pan-State / Supreme Court & Delhi High Court)",
   });
 
-  const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setProfileData((prev) => ({
-      ...prev,
-      [e.target.name]: e.target.value,
-    }));
-  };
-
-  const handleSaveProfile = async () => {
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
     setLoading(true);
-    try {
-      toast.success("Profile updated successfully");
-    } catch (error) {
-      toast.error("Failed to update profile");
-    } finally {
+    setTimeout(() => {
       setLoading(false);
-    }
+      toast.success("Preferences saved successfully");
+    }, 600);
   };
 
   return (
-    <div className="p-8 space-y-8">
-      {/* Page Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-slate-900">Settings</h1>
-        <p className="text-slate-600 mt-1">
-          Manage your account and preferences
-        </p>
+    <div className="p-8 lg:p-10 max-w-4xl mx-auto space-y-8">
+      {/* 1. Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-border pb-6">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+            <span>System</span> / <span>Settings & Configuration</span>
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            Workspace Preferences
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Manage your firm profile, statutory presets, and Indian Kanoon research defaults.
+          </p>
+        </div>
       </div>
 
-      {/* Tabs */}
-      <div className="bg-white rounded-lg shadow border border-slate-200 overflow-hidden">
-        <div className="flex border-b border-slate-200">
-          {[
-            { id: "profile", label: "Profile", icon: User },
-            { id: "notifications", label: "Notifications", icon: Bell },
-          ].map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-6 py-4 font-medium border-b-2 transition ${
-                  activeTab === tab.id
-                    ? "border-blue-600 text-blue-600"
-                    : "border-transparent text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="p-8">
-          {/* Profile Tab */}
-          {activeTab === "profile" && (
-            <div className="space-y-6 max-w-2xl">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Full Name
+      <form onSubmit={handleSave} className="space-y-6">
+        <Card className="shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-base">Firm & Advocate Profile</CardTitle>
+            <CardDescription className="text-xs">
+              Entity identification used on exportable legal dossiers and contract headers
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-foreground">
+                  Practitioner Name
                 </label>
-                <input
+                <Input
                   type="text"
-                  name="name"
                   value={profileData.name}
-                  onChange={handleProfileChange}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  onChange={(e) =>
+                    setProfileData({ ...profileData, name: e.target.value })
+                  }
+                  className="text-xs h-9"
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Email Address
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-foreground">
+                  Official Email Address
                 </label>
-                <input
+                <Input
                   type="email"
-                  name="email"
                   value={profileData.email}
-                  disabled
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg bg-slate-50 text-slate-600 cursor-not-allowed"
+                  onChange={(e) =>
+                    setProfileData({ ...profileData, email: e.target.value })
+                  }
+                  className="text-xs h-9"
                 />
-                <p className="text-xs text-slate-600 mt-1">
-                  Email cannot be changed
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-foreground">
+                  Firm / Legal Department
+                </label>
+                <Input
+                  type="text"
+                  value={profileData.firm}
+                  onChange={(e) =>
+                    setProfileData({ ...profileData, firm: e.target.value })
+                  }
+                  className="text-xs h-9"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-foreground">
+                  Default Legal Jurisdiction
+                </label>
+                <Input
+                  type="text"
+                  value={profileData.jurisdiction}
+                  onChange={(e) =>
+                    setProfileData({ ...profileData, jurisdiction: e.target.value })
+                  }
+                  className="text-xs h-9"
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-base">Statutory & AI Configuration</CardTitle>
+            <CardDescription className="text-xs">
+              Autonomous analysis rules applied during contract and case ingestion
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center justify-between p-3 rounded-md border border-border bg-muted/20">
+              <div>
+                <p className="text-xs font-semibold text-foreground">
+                  Indian Kanoon Live Precedent Retrieval
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  Automatically query High Court and Supreme Court case precedents for flagged clauses.
                 </p>
               </div>
-
-              <button
-                onClick={handleSaveProfile}
-                disabled={loading}
-                className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium px-6 py-2 rounded-lg transition"
-              >
-                {loading ? "Saving..." : "Save Changes"}
-              </button>
+              <Badge variant="success">Enabled</Badge>
             </div>
-          )}
 
-          {/* Notifications Tab */}
-          {activeTab === "notifications" && (
-            <div className="space-y-6 max-w-2xl">
-              <div className="space-y-4">
-                {[
-                  { label: "Contract uploaded", id: "upload" },
-                  { label: "Analysis complete", id: "analysis" },
-                  { label: "High risk detected", id: "risk" },
-                  { label: "Team invitations", id: "invites" },
-                ].map((notification) => (
-                  <label
-                    key={notification.id}
-                    className="flex items-center gap-3 cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      defaultChecked
-                      className="rounded w-4 h-4"
-                    />
-                    <span className="text-slate-700">{notification.label}</span>
-                  </label>
-                ))}
+            <div className="flex items-center justify-between p-3 rounded-md border border-border bg-muted/20">
+              <div>
+                <p className="text-xs font-semibold text-foreground">
+                  Strict ICA Section 27 Restraint Check
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  Flag all non-compete clauses as void per Percept D'Mark and Niranjan Shankar Golikari standards.
+                </p>
               </div>
-
-              <button className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2 rounded-lg transition">
-                Save Preferences
-              </button>
+              <Badge variant="success">Strict</Badge>
             </div>
-          )}
-        </div>
-      </div>
+          </CardContent>
+        </Card>
 
-      {/* Account Info */}
-      <div className="bg-slate-50 rounded-lg border border-slate-200 p-6">
-        <h3 className="font-semibold text-slate-900 mb-3">
-          Account Information
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-          <div>
-            <p className="text-slate-600">Organization</p>
-            <p className="text-slate-900 font-medium">Lexington & Co</p>
-          </div>
-          <div>
-            <p className="text-slate-600">Membership</p>
-            <p className="text-slate-900 font-medium">Active (Enterprise)</p>
-          </div>
+        <div className="flex items-center justify-end">
+          <Button type="submit" loading={loading} className="text-xs">
+            <Save className="w-3.5 h-3.5 mr-1.5" />
+            Save Preferences
+          </Button>
         </div>
-      </div>
+      </form>
     </div>
   );
 }

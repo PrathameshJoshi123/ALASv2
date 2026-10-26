@@ -3,92 +3,212 @@
 @tailwind utilities;
 @import "github-markdown-css/github-markdown-light.css";
 
-* {
-  @apply border-border;
+@layer base {
+  :root {
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 222 47% 11%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 214 32% 91%;
+    --secondary-foreground: 222 47% 11%;
+
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+
+    --accent: 221 83% 53%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 221 83% 53%;
+
+    --radius: 0.5rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased selection:bg-blue-100 selection:text-blue-900;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
 }
 
-body {
-  @apply bg-slate-50 text-slate-900;
-  font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu",
-    "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-code {
-  font-family:
-    source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
-}
-
-/* Custom Scrollbar */
+/* Custom Sleek Scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-slate-100;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-slate-400 rounded;
+  @apply bg-slate-300/80 rounded-full;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-slate-500;
+  @apply bg-slate-400;
 }
 
-/* Animations */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes slideUp {
-  from {
-    transform: translateY(10px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-.animate-fadeIn {
-  animation: fadeIn 0.3s ease-in;
-}
-
-.animate-slideUp {
-  animation: slideUp 0.3s ease-out;
-}
-
+/* Contract & Legal Document Typography */
 .contract-markdown.markdown-body {
-  background-color: transparent;
-  color: #334155;
-  font-size: 16px;
+  background-color: #ffffff;
+  color: #0f172a;
+  font-size: 15px;
   line-height: 1.8;
+  font-family: inherit;
 }
 
-.contract-markdown.markdown-body h1,
-.contract-markdown.markdown-body h2,
-.contract-markdown.markdown-body h3,
-.contract-markdown.markdown-body h4,
-.contract-markdown.markdown-body h5,
-.contract-markdown.markdown-body h6 {
-  color: #0b1437;
+.contract-markdown.markdown-body h1 {
+  color: #0f172a;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin-top: 0;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e2e8f0;
+  page-break-after: avoid;
+  break-after: avoid;
 }
 
-.contract-markdown.markdown-body table {
-  width: 100%;
-  max-width: 100%;
+.contract-markdown.markdown-body h2 {
+  color: #0f172a;
+  font-size: 18px;
+  font-weight: 700;
+  margin-top: 32px;
+  margin-bottom: 14px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #f1f5f9;
+  page-break-after: avoid;
+  break-after: avoid;
 }
 
-.contract-markdown.markdown-body pre {
-  border: 1px solid #e2e8f0;
+.contract-markdown.markdown-body h3 {
+  color: #1e293b;
+  font-size: 15px;
+  font-weight: 600;
+  margin-top: 24px;
+  margin-bottom: 10px;
+  page-break-after: avoid;
+  break-after: avoid;
+}
+
+.contract-markdown.markdown-body p {
+  margin-bottom: 16px;
+  text-align: justify;
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+.contract-markdown.markdown-body strong {
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.contract-markdown.markdown-body ul,
+.contract-markdown.markdown-body ol {
+  padding-left: 24px;
+  margin-bottom: 16px;
+}
+
+.contract-markdown.markdown-body li {
+  margin-bottom: 6px;
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+/* Institutional Legal Print & PDF Stylesheet */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 18mm 15mm;
+  }
+
+  /* Hide UI elements, navigation, action buttons, sidebars, modals */
+  header,
+  aside,
+  nav,
+  button,
+  .no-print,
+  [role="dialog"],
+  [aria-modal="true"],
+  .toaster {
+    display: none !important;
+  }
+
+  /* Reset all overflow constraints and fixed viewport heights */
+  html,
+  body,
+  main,
+  div {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Unconstrain document wrapper to full printable page */
+  .max-w-3xl,
+  .document-printable {
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+  }
+
+  #contract-document-content {
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    width: 100% !important;
+  }
+
+  /* High contrast black text for institutional printing */
+  .contract-markdown.markdown-body {
+    color: #000000 !important;
+    font-size: 11pt !important;
+    line-height: 1.6 !important;
+  }
+
+  .contract-markdown.markdown-body h1 {
+    font-size: 18pt !important;
+    color: #000000 !important;
+    border-bottom: 1.5pt solid #000000 !important;
+  }
+
+  .contract-markdown.markdown-body h2 {
+    font-size: 13pt !important;
+    color: #000000 !important;
+    border-bottom: 1pt solid #cbd5e1 !important;
+  }
+
+  .contract-markdown.markdown-body h3 {
+    font-size: 11pt !important;
+    color: #000000 !important;
+  }
+
+  .contract-markdown.markdown-body p,
+  .contract-markdown.markdown-body li {
+    orphans: 3;
+    widows: 3;
+  }
 }

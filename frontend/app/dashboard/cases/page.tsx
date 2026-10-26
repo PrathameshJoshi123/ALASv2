@@ -3,9 +3,32 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, FolderKanban, FileText, ChevronRight, Sparkles, AlertCircle, Clock, CheckCircle2, Loader2, X, Upload, Trash2 } from "lucide-react";
+import {
+  Plus,
+  FolderKanban,
+  FileText,
+  ChevronRight,
+  Clock,
+  CheckCircle2,
+  Loader2,
+  Upload,
+  Trash2,
+  AlertCircle,
+} from "lucide-react";
 import toast from "react-hot-toast";
 import { apiClient } from "@/services/api";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 interface CaseItem {
   id: string;
@@ -79,20 +102,21 @@ export default function CasesPage() {
       });
 
       if (selectedFiles.length > 0) {
-        toast.loading(`Uploading ${selectedFiles.length} initial document(s)...`, { id: "upload-toast" });
+        toast.loading(`Uploading ${selectedFiles.length} initial document(s)...`, {
+          id: "upload-toast",
+        });
         for (const file of selectedFiles) {
           await apiClient.uploadCaseDocument(createdCase.id, file);
         }
         toast.dismiss("upload-toast");
       }
 
-      toast.success("Case file created successfully!");
+      toast.success("Case file initialized successfully!");
       setNewTitle("");
       setNewDescription("");
       setSelectedFiles([]);
       setShowModal(false);
-      
-      // Redirect to the newly created case workspace
+
       router.push(`/dashboard/cases/${createdCase.id}`);
     } catch (err: any) {
       toast.dismiss("upload-toast");
@@ -104,247 +128,214 @@ export default function CasesPage() {
 
   const getStatusBadge = (status: string, hasAnalysis: boolean) => {
     if (status === "analyzed" || hasAnalysis) {
-      return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-          <CheckCircle2 className="w-3.5 h-3.5" />
-          Analyzed
-        </span>
-      );
+      return <Badge variant="success">Analyzed</Badge>;
     }
     if (status === "processing") {
-      return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          Analyzing Pipeline...
-        </span>
-      );
+      return <Badge variant="info">In Review</Badge>;
     }
     if (status === "error") {
-      return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
-          <AlertCircle className="w-3.5 h-3.5" />
-          Error
-        </span>
-      );
+      return <Badge variant="destructive">Error</Badge>;
     }
-    return (
-      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-        <Clock className="w-3.5 h-3.5" />
-        Draft / Created
-      </span>
-    );
+    return <Badge variant="outline">Draft Matter</Badge>;
   };
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-6">
-      {/* Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs">
+    <div className="p-8 lg:p-10 max-w-7xl mx-auto space-y-8">
+      {/* 1. Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-border pb-6">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
-              <FolderKanban className="w-5 h-5 text-indigo-600" />
-            </div>
-            <h1 className="text-2xl font-bold text-slate-900">Case File Analysis</h1>
+          <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+            <span>Litigation Management</span> / <span>Case Files</span>
           </div>
-          <p className="text-slate-500 text-sm">
-            Upload case files (PDF filings, FIRs, charge sheets & evidence photos), trigger multi-agent pipeline, and view structured database analysis.
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            Case Files & Multi-Document Repository
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Organize litigation filings, FIRs, witness testimonies, and cross-examine evidence with automated event chronologies.
           </p>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="bg-[#0B1437] text-white hover:bg-[#152458] px-4 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition shadow-xs shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          New Case File
-        </button>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="default"
+            onClick={() => setShowModal(true)}
+            className="text-xs"
+          >
+            <Plus className="w-3.5 h-3.5 mr-1.5" />
+            Create Case File
+          </Button>
+        </div>
       </div>
 
-      {/* Main Content */}
+      {/* 2. Cases Grid */}
       {loading ? (
-        <div className="flex items-center justify-center py-20 bg-white rounded-2xl border border-slate-200/80">
-          <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-          <span className="ml-3 text-slate-600 font-medium">Loading case files...</span>
+        <div className="p-16 flex flex-col items-center justify-center text-xs text-muted-foreground gap-3">
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+          <span>Loading litigation case files...</span>
         </div>
       ) : cases.length === 0 ? (
-        <div className="text-center py-16 px-4 bg-white rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
-          <div className="w-16 h-16 rounded-full bg-indigo-50 flex items-center justify-center mx-auto">
-            <FolderKanban className="w-8 h-8 text-indigo-600" />
+        <Card className="shadow-sm border-dashed p-12 text-center space-y-4">
+          <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center mx-auto text-muted-foreground">
+            <FolderKanban className="w-6 h-6" />
           </div>
-          <div className="max-w-md mx-auto space-y-1">
-            <h3 className="text-lg font-bold text-slate-900">No Case Files Found</h3>
-            <p className="text-sm text-slate-500">
-              Create your first case file to start uploading documents and running automated multi-agent legal analysis.
+          <div className="space-y-1">
+            <h3 className="text-sm font-semibold text-foreground">No Case Files Yet</h3>
+            <p className="text-xs text-muted-foreground max-w-md mx-auto">
+              Create your first litigation matter to upload multiple legal documents, generate factual timelines, and run cross-document Q&A.
             </p>
           </div>
-          <button
+          <Button
+            variant="default"
+            size="sm"
             onClick={() => setShowModal(true)}
-            className="bg-[#0B1437] text-white hover:bg-[#152458] px-5 py-2.5 rounded-xl text-sm font-bold inline-flex items-center gap-2 shadow-xs transition"
+            className="text-xs"
           >
-            <Plus className="w-4 h-4" />
-            Create First Case
-          </button>
-        </div>
+            <Plus className="w-3.5 h-3.5 mr-1.5" />
+            Create Case Matter
+          </Button>
+        </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {cases.map((c) => (
-            <div
+            <Card
               key={c.id}
-              className="bg-white rounded-2xl border border-slate-200/80 p-6 flex flex-col justify-between hover:shadow-md transition group"
+              onClick={() => router.push(`/dashboard/cases/${c.id}`)}
+              className="cursor-pointer hover:border-slate-400/80 transition-all shadow-sm flex flex-col justify-between"
             >
-              <div className="space-y-3">
+              <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-2">
-                  <h2 className="font-bold text-slate-900 text-lg group-hover:text-indigo-600 transition line-clamp-1">
-                    {c.title}
-                  </h2>
+                  <div className="space-y-1">
+                    <CardTitle className="text-sm font-bold text-foreground line-clamp-1">
+                      {c.title}
+                    </CardTitle>
+                    <p className="text-[11px] text-muted-foreground">
+                      Created: {new Date(c.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
                   {getStatusBadge(c.status, c.has_analysis)}
                 </div>
+                <CardDescription className="text-xs line-clamp-2 mt-2 leading-relaxed">
+                  {c.description || "Litigation matter records under examination."}
+                </CardDescription>
+              </CardHeader>
 
-                <p className="text-slate-500 text-sm line-clamp-2 min-h-[40px]">
-                  {c.description || "No description provided for this case file."}
-                </p>
-
-                <div className="flex items-center gap-4 text-xs font-medium text-slate-400 pt-2 border-t border-slate-100">
-                  <span className="flex items-center gap-1 text-slate-600">
-                    <FileText className="w-3.5 h-3.5" />
-                    {c.documents_count} {c.documents_count === 1 ? "Document" : "Documents"}
-                  </span>
-                  <span>•</span>
-                  <span>{new Date(c.created_at).toLocaleDateString(undefined, { dateStyle: "medium" })}</span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 pt-5">
-                <Link
-                  href={`/dashboard/cases/${c.id}`}
-                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-800 py-2 px-3 rounded-lg text-xs font-bold text-center transition flex items-center justify-center gap-1"
-                >
-                  Manage Docs
-                </Link>
-                {c.has_analysis || c.status === "analyzed" ? (
-                  <Link
-                    href={`/dashboard/cases/${c.id}/results`}
-                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-3 rounded-lg text-xs font-bold text-center transition flex items-center justify-center gap-1 shadow-2xs"
-                  >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    View Results
-                  </Link>
-                ) : (
-                  <Link
-                    href={`/dashboard/cases/${c.id}`}
-                    className="flex-1 bg-[#0B1437] hover:bg-[#152458] text-white py-2 px-3 rounded-lg text-xs font-bold text-center transition flex items-center justify-center gap-1"
-                  >
-                    Run Pipeline <ChevronRight className="w-3.5 h-3.5" />
-                  </Link>
-                )}
-              </div>
-            </div>
+              <CardContent className="pt-0 border-t border-border/60 py-3 flex items-center justify-between text-xs">
+                <span className="font-semibold text-muted-foreground">
+                  {c.documents_count || 0} Exhibits / Filings
+                </span>
+                <span className="text-accent hover:underline font-semibold flex items-center gap-1">
+                  <span>Workspace</span>
+                  <ChevronRight className="w-3 h-3" />
+                </span>
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}
 
-      {/* New Case Modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-2xs p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-5 shadow-2xl border border-slate-100">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-              <div className="flex items-center gap-2">
-                <FolderKanban className="w-5 h-5 text-indigo-600" />
-                <h3 className="font-bold text-lg text-slate-900">Create New Legal Case File</h3>
-              </div>
-              <button
-                onClick={() => setShowModal(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
-              >
-                <X className="w-5 h-5" />
-              </button>
+      {/* 3. Create Case Modal (Shadcn Dialog) */}
+      <Dialog open={showModal} onOpenChange={setShowModal}>
+        <DialogHeader>
+          <DialogTitle>Initialize New Case File</DialogTitle>
+          <DialogDescription>
+            Set up a litigation matter to index petitions, affidavits, and documentary evidence.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleCreateCase} className="space-y-4">
+          <div className="space-y-1">
+            <label className="text-xs font-semibold text-foreground">
+              Case Matter Title *
+            </label>
+            <Input
+              type="text"
+              placeholder="e.g. State vs. Sharma & Ors. (Commercial Suit 402/2026)"
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              className="text-xs h-9"
+              required
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs font-semibold text-foreground">
+              Matter Summary / Scope
+            </label>
+            <Textarea
+              placeholder="Brief summary of dispute, parties, forum (e.g. High Court of Delhi), and key relief sought..."
+              value={newDescription}
+              onChange={(e) => setNewDescription(e.target.value)}
+              rows={3}
+              className="text-xs resize-none"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-foreground">
+              Attach Initial Filings / Exhibits (Optional)
+            </label>
+            <div className="border border-dashed border-border rounded-md p-4 text-center hover:bg-muted/30 cursor-pointer">
+              <input
+                type="file"
+                multiple
+                accept=".pdf,.jpg,.jpeg,.png"
+                onChange={handleFileChange}
+                className="hidden"
+                id="case-doc-upload"
+              />
+              <label htmlFor="case-doc-upload" className="cursor-pointer block">
+                <Upload className="w-5 h-5 mx-auto text-muted-foreground mb-1" />
+                <span className="text-xs font-semibold text-foreground">
+                  Select PDFs or Scanned Exhibits
+                </span>
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  PDF, JPG, PNG supported
+                </p>
+              </label>
             </div>
 
-            <form onSubmit={handleCreateCase} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Case Title *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. State of Maharashtra vs. John Doe"
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Case Description / Background
-                </label>
-                <textarea
-                  rows={3}
-                  placeholder="e.g. Homicide investigation involving forensic ballistics, FIR statement, and photo evidence."
-                  value={newDescription}
-                  onChange={(e) => setNewDescription(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Attach Initial Case Documents (Optional)
-                </label>
-                <div className="border border-dashed border-slate-300 hover:border-indigo-500 transition rounded-xl p-4 text-center cursor-pointer relative bg-slate-50">
-                  <input
-                    type="file"
-                    multiple
-                    accept=".pdf,.jpg,.jpeg,.png,.bmp,.webp"
-                    onChange={handleFileChange}
-                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                  />
-                  <div className="flex items-center justify-center gap-2 text-indigo-600 font-semibold text-xs">
-                    <Upload className="w-4 h-4" />
-                    <span>Choose PDFs or Evidence Images</span>
+            {selectedFiles.length > 0 && (
+              <div className="space-y-1 max-h-32 overflow-y-auto">
+                {selectedFiles.map((f, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between text-xs px-2.5 py-1 rounded bg-muted text-foreground"
+                  >
+                    <span className="truncate max-w-[280px]">{f.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeSelectedFile(i)}
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-1">Supports PDF, JPG, PNG, WEBP</p>
-                </div>
-
-                {selectedFiles.length > 0 && (
-                  <div className="mt-2.5 space-y-1.5 max-h-32 overflow-y-auto">
-                    {selectedFiles.map((file, idx) => (
-                      <div key={idx} className="flex items-center justify-between text-xs bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
-                        <span className="truncate font-medium text-slate-700 max-w-[280px]">{file.name}</span>
-                        <button
-                          type="button"
-                          onClick={() => removeSelectedFile(idx)}
-                          className="text-slate-400 hover:text-rose-600 transition p-0.5"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                ))}
               </div>
-
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="bg-[#0B1437] hover:bg-[#152458] text-white px-5 py-2 rounded-xl text-sm font-bold transition flex items-center gap-2 shadow-xs disabled:opacity-50"
-                >
-                  {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Create Case File
-                </button>
-              </div>
-            </form>
+            )}
           </div>
-        </div>
-      )}
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowModal(false)}
+              className="text-xs"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="default"
+              size="sm"
+              loading={submitting}
+              className="text-xs"
+            >
+              Initialize Matter
+            </Button>
+          </DialogFooter>
+        </form>
+      </Dialog>
     </div>
   );
 }

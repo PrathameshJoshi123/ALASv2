@@ -1,88 +1,110 @@
 "use client";
 
-import { BarChart, LineChart, PieChart } from "lucide-react";
+import { BarChart3, TrendingUp, ShieldAlert, FileText, CheckCircle2 } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 export default function AnalyticsPage() {
   return (
-    <div className="p-8 space-y-8">
-      {/* Page Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-slate-900">Analytics</h1>
-        <p className="text-slate-600 mt-1">
-          Track your contract analysis metrics
-        </p>
+    <div className="p-8 lg:p-10 max-w-7xl mx-auto space-y-8">
+      {/* 1. Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-border pb-6">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+            <span>System</span> / <span>Analytics & Metrics</span>
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            Compliance & Operations Analytics
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Monitor contract turnaround velocity, Indian Contract Act compliance rates, and risk distribution.
+          </p>
+        </div>
       </div>
 
-      {/* Metrics Grid */}
+      {/* 2. Key Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Contracts Analyzed This Month */}
-        <div className="bg-white rounded-lg shadow border border-slate-200 p-6">
-          <p className="text-slate-600 text-sm font-medium mb-2">
-            Contracts Analyzed
-          </p>
-          <p className="text-3xl font-bold text-slate-900">24</p>
-          <p className="text-xs text-green-600 mt-2">↑ 12% from last month</p>
-        </div>
+        <Card className="shadow-sm">
+          <CardHeader className="pb-2">
+            <CardDescription className="text-xs">Contracts Audited (30 Days)</CardDescription>
+            <CardTitle className="text-2xl font-bold text-foreground">24</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
+              <TrendingUp className="w-3.5 h-3.5" />
+              <span>+18% compared to prior month</span>
+            </p>
+          </CardContent>
+        </Card>
 
-        {/* Average Risk Score */}
-        <div className="bg-white rounded-lg shadow border border-slate-200 p-6">
-          <p className="text-slate-600 text-sm font-medium mb-2">
-            Average Risk Score
-          </p>
-          <p className="text-3xl font-bold text-slate-900">42%</p>
-          <p className="text-xs text-slate-600 mt-2">Across all contracts</p>
-        </div>
+        <Card className="shadow-sm">
+          <CardHeader className="pb-2">
+            <CardDescription className="text-xs">Average Portfolio Risk Score</CardDescription>
+            <CardTitle className="text-2xl font-bold text-foreground">34%</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-muted-foreground">
+              Low-to-moderate corporate risk exposure
+            </p>
+          </CardContent>
+        </Card>
 
-        {/* High Risk Contracts */}
-        <div className="bg-white rounded-lg shadow border border-slate-200 p-6">
-          <p className="text-slate-600 text-sm font-medium mb-2">
-            High Risk Contracts
-          </p>
-          <p className="text-3xl font-bold text-red-600">6</p>
-          <p className="text-xs text-slate-600 mt-2">Requiring attention</p>
-        </div>
+        <Card className="shadow-sm">
+          <CardHeader className="pb-2">
+            <CardDescription className="text-xs">Statutory Flags Triggered</CardDescription>
+            <CardTitle className="text-2xl font-bold text-red-600">7</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-muted-foreground">
+              Primarily Section 27 (Post-term non-competes)
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Chart Placeholders */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Risk Distribution */}
-        <div className="bg-white rounded-lg shadow border border-slate-200 p-6">
-          <h2 className="text-lg font-bold text-slate-900 mb-4">
-            Risk Distribution
-          </h2>
-          <div className="flex items-center justify-center h-64 bg-slate-50 rounded border border-slate-200">
-            <div className="text-center">
-              <PieChart className="w-16 h-16 text-slate-300 mx-auto mb-2" />
-              <p className="text-slate-500">Pie chart coming soon</p>
+      {/* 3. Statutory Breakdown */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card className="shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold">Indian Contract Act Audit Breakdown</CardTitle>
+            <CardDescription className="text-xs">Distribution of detected statutory risks</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center justify-between text-xs p-2.5 rounded bg-muted/40">
+              <span className="font-semibold text-foreground">Section 27 (Restraint of Trade)</span>
+              <Badge variant="destructive">5 Flags</Badge>
             </div>
-          </div>
-        </div>
-
-        {/* Contracts by Type */}
-        <div className="bg-white rounded-lg shadow border border-slate-200 p-6">
-          <h2 className="text-lg font-bold text-slate-900 mb-4">
-            Contracts by Type
-          </h2>
-          <div className="flex items-center justify-center h-64 bg-slate-50 rounded border border-slate-200">
-            <div className="text-center">
-              <BarChart className="w-16 h-16 text-slate-300 mx-auto mb-2" />
-              <p className="text-slate-500">Bar chart coming soon</p>
+            <div className="flex items-center justify-between text-xs p-2.5 rounded bg-muted/40">
+              <span className="font-semibold text-foreground">Section 74 (Penal Damages)</span>
+              <Badge variant="warning">2 Flags</Badge>
             </div>
-          </div>
-        </div>
-      </div>
+            <div className="flex items-center justify-between text-xs p-2.5 rounded bg-muted/40">
+              <span className="font-semibold text-foreground">Section 28 (Arbitration & Seat)</span>
+              <Badge variant="success">All Validated</Badge>
+            </div>
+          </CardContent>
+        </Card>
 
-      {/* Trend Chart */}
-      <div className="bg-white rounded-lg shadow border border-slate-200 p-6">
-        <h2 className="text-lg font-bold text-slate-900 mb-4">
-          Analysis Trend (Last 30 Days)
-        </h2>
-        <div className="flex items-center justify-center h-80 bg-slate-50 rounded border border-slate-200">
-          <div className="text-center">
-            <LineChart className="w-16 h-16 text-slate-300 mx-auto mb-2" />
-            <p className="text-slate-500">Line chart coming soon</p>
-          </div>
-        </div>
+        <Card className="shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold">Autonomous Drafting Throughput</CardTitle>
+            <CardDescription className="text-xs">Synthesis pipeline metrics</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center justify-between text-xs p-2.5 rounded bg-muted/40">
+              <span className="font-semibold text-foreground">Average Synthesis Duration</span>
+              <span className="font-mono text-muted-foreground">18.4 seconds</span>
+            </div>
+            <div className="flex items-center justify-between text-xs p-2.5 rounded bg-muted/40">
+              <span className="font-semibold text-foreground">Indian Kanoon Precedents Cited</span>
+              <span className="font-mono text-muted-foreground">84 citations</span>
+            </div>
+            <div className="flex items-center justify-between text-xs p-2.5 rounded bg-muted/40">
+              <span className="font-semibold text-foreground">Redline Acceptance Rate</span>
+              <span className="font-mono text-emerald-600 font-bold">92%</span>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

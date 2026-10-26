@@ -267,18 +267,52 @@ class APIClient {
 
 
   // Contract drafting endpoints
-  async createDraftContract(prompt: string, contractType = "Custom Contract") {
+  async createDraftContract(
+    prompt: string,
+    contractType = "Custom Contract",
+    options?: {
+      favor_party?: string;
+      governing_law?: string;
+      drafting_style?: string;
+      company_name?: string;
+      counterparty_name?: string;
+    },
+  ) {
     const response = await this.client.post("/api/v1/contracts/draft/create", {
       contract_prompt: prompt,
       contract_type: contractType,
+      favor_party: options?.favor_party || "Balanced",
+      governing_law: options?.governing_law || "Indian Contract Act, 1872",
+      drafting_style: options?.drafting_style || "Institutional Legal",
+      company_name: options?.company_name || null,
+      counterparty_name: options?.counterparty_name || null,
     });
     return response.data;
   }
 
-  async draftContract(documentId: string, draftingInstructions: string) {
+  async draftContract(
+    documentId: string,
+    draftingInstructions: string,
+    options?: {
+      contract_type?: string;
+      favor_party?: string;
+      governing_law?: string;
+      drafting_style?: string;
+      company_name?: string;
+      counterparty_name?: string;
+    },
+  ) {
     const response = await this.client.post(
       `/api/v1/contracts/${documentId}/draft`,
-      { drafting_instructions: draftingInstructions },
+      {
+        drafting_instructions: draftingInstructions,
+        contract_type: options?.contract_type,
+        favor_party: options?.favor_party || "Balanced",
+        governing_law: options?.governing_law || "Indian Contract Act, 1872",
+        drafting_style: options?.drafting_style || "Institutional Legal",
+        company_name: options?.company_name || null,
+        counterparty_name: options?.counterparty_name || null,
+      },
     );
     return response.data;
   }
@@ -290,6 +324,32 @@ class APIClient {
     );
     return response.data;
   }
+
+  async getDraftEvents(documentId: string) {
+    const response = await this.client.get(
+      `/api/v1/contracts/${documentId}/draft/events`,
+    );
+    return response.data;
+  }
+
+  async getDraftLogs(documentId: string) {
+    const response = await this.client.get(
+      `/api/v1/contracts/${documentId}/draft/logs`,
+    );
+    return response.data;
+  }
+
+  async getContractDraftVersions(documentId: string) {
+    const response = await this.client.get(
+      `/api/v1/contracts/${documentId}/draft/versions`,
+    );
+    return response.data;
+  }
+
+  getDraftStreamUrl(documentId: string) {
+    return `${API_URL}/api/v1/contracts/${documentId}/draft/stream`;
+  }
+
 
   // Case File Analysis endpoints
   async getCases() {

@@ -82,35 +82,37 @@ def chunk_document(
         )
     
     # Check if processed elements exist
-    import json
-    from pathlib import Path
-    
-    output_dir = Path("backend/storage/output")
-    output_file = output_dir / f"{document_id}.json"
-    
-    if not output_file.exists():
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Processed elements not found for document {document_id}. "
-                   f"Please process the PDF first.",
-        )
-    
-    # Load elements from file
-    try:
-        with open(output_file, "r", encoding="utf-8") as f:
-            output_data = json.load(f)
-    except Exception as e:
-        logger.error(f"Failed to load elements for document {document_id}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to load processed elements: {e}",
-        )
-    
-    elements = output_data.get("elements", [])
+    # 1. Primary: Load elements from database extraction
+    from backend.services.document_extraction_service import (
+        get_document_extraction_from_db,
+        save_document_extraction_to_db,
+    )
+    extraction_record = get_document_extraction_from_db(document_id)
+    elements = []
+
+    if extraction_record and extraction_record.get("elements"):
+        elements = extraction_record["elements"]
+    else:
+        # 2. Secondary fallback: Load elements from file cache
+        import json
+        from pathlib import Path
+        output_dir = Path("backend/storage/output")
+        output_file = output_dir / f"{document_id}.json"
+        
+        if output_file.exists():
+            try:
+                with open(output_file, "r", encoding="utf-8") as f:
+                    output_data = json.load(f)
+                elements = output_data.get("elements", [])
+                if elements:
+                    save_document_extraction_to_db(document_id, elements, filename=document.name)
+            except Exception as e:
+                logger.error(f"Failed to load elements for document {document_id}: {e}")
+
     if not elements:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"No elements found in processed output for document {document_id}",
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Processed elements not found in database or storage for document {document_id}. Please process the PDF first.",
         )
     
     # Submit task to Celery

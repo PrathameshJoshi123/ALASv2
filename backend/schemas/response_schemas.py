@@ -75,6 +75,7 @@ class DocumentResponse(BaseModel):
     recommended_actions: Optional[list[str]] = Field(default_factory=list, description="Recommended actions")
     clauses: Optional[list[dict[str, Any]]] = Field(default_factory=list, description="Clauses analysis list")
     analysis: Optional[dict[str, Any]] = Field(None, description="Raw DB analysis dictionary")
+    draft: Optional[dict[str, Any]] = Field(None, description="Drafted contract data from DB")
     analysis_markdown: Optional[str] = Field(None, description="Markdown content of contract or analysis")
 
 

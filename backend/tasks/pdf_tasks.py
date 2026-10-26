@@ -88,7 +88,19 @@ def process_pdf_task(
         
         logger.info(f"Processed document {document_id}: extracted {len(elements)} elements")
         
-        # Save output to file in output folder
+        # Primary: Save structured extraction directly to the database
+        try:
+            from backend.services.document_extraction_service import save_document_extraction_to_db
+            save_document_extraction_to_db(
+                document_id=document_id,
+                elements=elements,
+                filename=filename,
+            )
+            logger.info(f"Saved document extraction to DB for {document_id}")
+        except Exception as db_extract_err:
+            logger.warning(f"Could not save document extraction to DB for {document_id}: {db_extract_err}")
+
+        # Secondary local cache for backward compatibility
         output_dir = Path("backend/storage/output")
         output_dir.mkdir(parents=True, exist_ok=True)
         output_file = output_dir / f"{document_id}.json"
@@ -101,10 +113,12 @@ def process_pdf_task(
             "elements": elements,
         }
         
-        with open(output_file, "w", encoding="utf-8") as f:
-            json.dump(output_data, f, indent=2, ensure_ascii=False)
-        
-        logger.info(f"Saved output to: {output_file}")
+        try:
+            with open(output_file, "w", encoding="utf-8") as f:
+                json.dump(output_data, f, indent=2, ensure_ascii=False)
+            logger.info(f"Saved cache output to: {output_file}")
+        except Exception as cache_err:
+            logger.warning(f"Could not write cache file {output_file}: {cache_err}")
         
         return {
             "status": "success",
@@ -296,36 +310,40 @@ def process_and_chunk_task(
                 logger.error(f"Failed orchestrator analysis in chained processing: {orchestrator_err}", exc_info=True)
                 agent_analysis = {"status": "degraded", "error": str(orchestrator_err)}
         
-        # Save only the orchestrator agent analysis report in the storage outputs folder
+        # Primary: Save orchestrator agent analysis report directly to database
         if agent_analysis:
             try:
-                output_dir = Path("backend/storage/outputs")
-                output_dir.mkdir(parents=True, exist_ok=True)
-                report_file = output_dir / f"{document_id}_analysis_report.json"
-                
                 # Serialize Pydantic model to dict or dump JSON directly
                 if hasattr(agent_analysis, "model_dump"):
                     report_data = agent_analysis.model_dump()
                 else:
                     report_data = agent_analysis
                 
-                with open(report_file, "w", encoding="utf-8") as f:
-                    json.dump(report_data, f, indent=2, ensure_ascii=False)
-                logger.info(f"Saved agent analysis report to: {report_file}")
-                
                 # Save to database
                 from backend.services.contract_analysis_service import save_contract_analysis_to_db
                 db_result = save_contract_analysis_to_db(document_id, report_data, overwrite=True)
                 logger.info(f"DB Save result for document {document_id}: {db_result}")
+
+                # Optional secondary file cache in storage outputs folder
+                report_file = ""
+                try:
+                    output_dir = Path("backend/storage/outputs")
+                    output_dir.mkdir(parents=True, exist_ok=True)
+                    report_file = output_dir / f"{document_id}_analysis_report.json"
+                    with open(report_file, "w", encoding="utf-8") as f:
+                        json.dump(report_data, f, indent=2, ensure_ascii=False)
+                    logger.info(f"Saved optional agent analysis report cache to: {report_file}")
+                except Exception as cache_ex:
+                    logger.warning(f"Could not write analysis report cache file: {cache_ex}")
                 
                 return {
                     "status": "success",
                     "document_id": document_id,
-                    "analysis_report_file": str(report_file),
+                    "analysis_report_file": str(report_file) if report_file else "",
                     "analysis": report_data
                 }
             except Exception as report_err:
-                logger.error(f"Failed to save agent analysis report: {report_err}", exc_info=True)
+                logger.error(f"Failed to save agent analysis report to database: {report_err}", exc_info=True)
 
         return {
             "status": "error",
@@ -454,36 +472,40 @@ def run_agent_analysis_task(
         
         logger.info(f"Orchestrator contract analysis completed for document: {document_id}")
         
-        # Save only the orchestrator agent analysis report in the storage outputs folder
+        # Primary: Save orchestrator agent analysis report directly to database
         if agent_analysis:
             try:
-                output_dir = Path("backend/storage/outputs")
-                output_dir.mkdir(parents=True, exist_ok=True)
-                report_file = output_dir / f"{document_id}_analysis_report.json"
-                
                 # Serialize Pydantic model to dict or dump JSON directly
                 if hasattr(agent_analysis, "model_dump"):
                     report_data = agent_analysis.model_dump()
                 else:
                     report_data = agent_analysis
                 
-                with open(report_file, "w", encoding="utf-8") as f:
-                    json.dump(report_data, f, indent=2, ensure_ascii=False)
-                logger.info(f"Saved agent analysis report to: {report_file}")
-                
                 # Save to database
                 from backend.services.contract_analysis_service import save_contract_analysis_to_db
                 db_result = save_contract_analysis_to_db(document_id, report_data, overwrite=True)
                 logger.info(f"DB Save result for document {document_id}: {db_result}")
+
+                # Optional secondary file cache in storage outputs folder
+                report_file = ""
+                try:
+                    output_dir = Path("backend/storage/outputs")
+                    output_dir.mkdir(parents=True, exist_ok=True)
+                    report_file = output_dir / f"{document_id}_analysis_report.json"
+                    with open(report_file, "w", encoding="utf-8") as f:
+                        json.dump(report_data, f, indent=2, ensure_ascii=False)
+                    logger.info(f"Saved optional agent analysis report cache to: {report_file}")
+                except Exception as cache_ex:
+                    logger.warning(f"Could not write analysis report cache file: {cache_ex}")
                 
                 return {
                     "status": "success",
                     "document_id": document_id,
-                    "analysis_report_file": str(report_file),
+                    "analysis_report_file": str(report_file) if report_file else "",
                     "analysis": report_data
                 }
             except Exception as report_err:
-                logger.error(f"Failed to save agent analysis report: {report_err}", exc_info=True)
+                logger.error(f"Failed to save agent analysis report to database: {report_err}", exc_info=True)
         
         return {
             "status": "error",

@@ -4,7 +4,7 @@ Document model for storing PDF contracts and their metadata.
 
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional
 
 from sqlalchemy import String, DateTime, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -13,6 +13,9 @@ from backend.database import Base
 
 if TYPE_CHECKING:
     from backend.services.chunking.database import Chunk
+    from backend.models.contract_draft import ContractDraft, ContractDraftVersion
+    from backend.models.contract_analysis import ContractAnalysis, ContractChatMessage
+    from backend.models.document_extraction import DocumentExtraction
 
 
 class Document(Base):
@@ -73,6 +76,43 @@ class Document(Base):
     chunks: Mapped[list["Chunk"]] = relationship(
         "Chunk",
         back_populates="document",
+        cascade="all, delete-orphan",
+    )
+
+    # Relationship to parsed document extraction
+    extraction: Mapped[Optional["DocumentExtraction"]] = relationship(
+        "DocumentExtraction",
+        back_populates="document",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+
+    # Relationship to contract analysis
+    analysis: Mapped[Optional["ContractAnalysis"]] = relationship(
+        "ContractAnalysis",
+        back_populates="document",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+
+    # Relationship to drafted contract in database
+    draft: Mapped[Optional["ContractDraft"]] = relationship(
+        "ContractDraft",
+        back_populates="document",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+
+    # Relationship to draft version history
+    draft_versions: Mapped[list["ContractDraftVersion"]] = relationship(
+        "ContractDraftVersion",
+        back_populates="document",
+        cascade="all, delete-orphan",
+    )
+
+    # Relationship to Q&A chat messages
+    chat_messages: Mapped[list["ContractChatMessage"]] = relationship(
+        "ContractChatMessage",
         cascade="all, delete-orphan",
     )
     

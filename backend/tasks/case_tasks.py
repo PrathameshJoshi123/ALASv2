@@ -237,12 +237,15 @@ def analyze_case_task(self, case_id: str) -> dict[str, Any]:
                 except ValueError:
                     result_data = {"raw_report": result_data}
 
-            # Save report to storage output file
-            output_dir = Path("backend/storage/output")
-            output_dir.mkdir(parents=True, exist_ok=True)
-            output_file = output_dir / f"{case_id}_analysis_report.json"
-            with open(output_file, "w", encoding="utf-8") as f:
-                json.dump(result_data, f, indent=2, default=str)
+            # Optional cache report to storage output file
+            try:
+                output_dir = Path("backend/storage/output")
+                output_dir.mkdir(parents=True, exist_ok=True)
+                output_file = output_dir / f"{case_id}_analysis_report.json"
+                with open(output_file, "w", encoding="utf-8") as f:
+                    json.dump(result_data, f, indent=2, default=str)
+            except Exception as cache_err:
+                logger.warning(f"Could not write case analysis cache file for {case_id}: {cache_err}")
 
             # Save findings report inside CaseAnalysis table in DB
             analysis = db.execute(

@@ -162,22 +162,37 @@ def rechunk_document_task(
                     "error": f"Document {document_id} not found",
                 }
             
-            # Get processed elements from storage
-            # Elements are typically stored in backend/storage/output/{document_id}.json
-            output_dir = Path("backend/storage/output")
-            output_file = output_dir / f"{document_id}.json"
-            
-            if not output_file.exists():
+            # Get processed elements: Query DB extraction first, with fallback to legacy file cache
+            from backend.services.document_extraction_service import (
+                get_document_extraction_from_db,
+                save_document_extraction_to_db,
+            )
+            extraction_record = get_document_extraction_from_db(document_id)
+            elements = []
+
+            if extraction_record and extraction_record.get("elements"):
+                elements = extraction_record["elements"]
+                logger.info(f"Loaded {len(elements)} elements from database extraction for {document_id}")
+            else:
+                output_dir = Path("backend/storage/output")
+                output_file = output_dir / f"{document_id}.json"
+                if output_file.exists():
+                    try:
+                        with open(output_file, "r", encoding="utf-8") as f:
+                            output_data = json.load(f)
+                        elements = output_data.get("elements", [])
+                        if elements:
+                            save_document_extraction_to_db(document_id, elements, filename=document.name)
+                            logger.info(f"Loaded {len(elements)} elements from file and saved to DB for {document_id}")
+                    except Exception as ex:
+                        logger.warning(f"Error reading legacy elements file for {document_id}: {ex}")
+
+            if not elements:
                 return {
                     "status": "error",
                     "document_id": document_id,
-                    "error": f"Processed elements not found at {output_file}",
+                    "error": f"Processed elements not found in database or storage for document {document_id}",
                 }
-            
-            with open(output_file, "r", encoding="utf-8") as f:
-                output_data = json.load(f)
-            
-            elements = output_data.get("elements", [])
             
             # Delete existing chunks
             deleted_count = delete_chunks_by_document(document_id, db)
@@ -349,9 +364,26 @@ def qa_retrieval_agent_task(
         if not response_data.get("answer"):
             response_data["answer"] = "Based on the provided contract document, no information was found for this query."
                 
-        # Save results to file in storage outputs folder
+        # Save QA result directly to database (ContractChatMessage)
         try:
             import uuid
+            from backend.models.contract_analysis import ContractChatMessage
+            with SessionLocal() as db:
+                qa_msg = ContractChatMessage(
+                    id=str(uuid.uuid4()),
+                    document_id=document_id,
+                    question=query,
+                    answer=response_data.get("answer", ""),
+                    citations=response_data.get("citations") or response_data.get("legal_sources") or [],
+                )
+                db.add(qa_msg)
+                db.commit()
+                logger.info(f"Saved contract QA message to DB for document {document_id}")
+        except Exception as db_qa_err:
+            logger.warning(f"Could not save QA message to DB: {db_qa_err}")
+
+        # Optional cache file in storage outputs folder
+        try:
             from pathlib import Path
             output_dir = Path("backend/storage/outputs")
             output_dir.mkdir(parents=True, exist_ok=True)

@@ -3,12 +3,25 @@
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { 
-  ArrowLeft, Upload, FileText, Image as ImageIcon, Play, 
-  CheckCircle2, AlertCircle, Loader2, Sparkles, RefreshCw, FileCheck
+import {
+  ArrowLeft,
+  Upload,
+  FileText,
+  Image as ImageIcon,
+  Play,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  RefreshCw,
+  FolderKanban,
+  ExternalLink,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { apiClient } from "@/services/api";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface CaseDocumentItem {
   id: string;
@@ -71,11 +84,12 @@ export default function CaseWorkspacePage() {
     fetchAgentLogs();
   }, [caseId]);
 
-  // Auto poll status & agent activity logs if case or any document is processing
   useEffect(() => {
     if (!caseDetail) return;
     const isCaseProcessing = caseDetail.status === "processing";
-    const hasDocProcessing = caseDetail.documents?.some(d => d.status === "processing" || d.status === "uploaded");
+    const hasDocProcessing = caseDetail.documents?.some(
+      (d) => d.status === "processing" || d.status === "uploaded",
+    );
 
     if (isCaseProcessing || hasDocProcessing) {
       const timer = setInterval(() => {
@@ -100,7 +114,7 @@ export default function CaseWorkspacePage() {
     setUploading(true);
     try {
       await apiClient.uploadCaseDocument(caseId, file);
-      toast.success(`Uploaded "${file.name}"! Document queued for OCR & parsing.`);
+      toast.success(`Uploaded "${file.name}"!`);
       fetchCase();
     } catch (err: any) {
       toast.error(err.response?.data?.detail || "Failed to upload document");
@@ -130,7 +144,7 @@ export default function CaseWorkspacePage() {
     setTriggering(true);
     try {
       await apiClient.triggerCaseAnalysis(caseId);
-      toast.success("Multi-agent analysis pipeline triggered successfully!");
+      toast.success("Litigation analysis pipeline triggered successfully!");
       fetchCase();
     } catch (err: any) {
       toast.error(err.response?.data?.detail || "Failed to trigger analysis pipeline");
@@ -139,47 +153,24 @@ export default function CaseWorkspacePage() {
     }
   };
 
-  const getDocIcon = (fileType: string) => {
-    if (fileType.includes("image")) {
-      return <ImageIcon className="w-5 h-5 text-purple-600" />;
-    }
-    return <FileText className="w-5 h-5 text-indigo-600" />;
-  };
-
   const getDocStatusBadge = (status: string) => {
     if (status === "completed") {
-      return (
-        <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-          <CheckCircle2 className="w-3 h-3" /> Ready
-        </span>
-      );
+      return <Badge variant="success">Parsed</Badge>;
     }
     if (status === "processing") {
-      return (
-        <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
-          <Loader2 className="w-3 h-3 animate-spin" /> Parsing...
-        </span>
-      );
+      return <Badge variant="info">Parsing...</Badge>;
     }
     if (status === "error") {
-      return (
-        <span className="inline-flex items-center gap-1 text-xs font-semibold text-rose-700 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200">
-          <AlertCircle className="w-3 h-3" /> Error
-        </span>
-      );
+      return <Badge variant="destructive">Error</Badge>;
     }
-    return (
-      <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
-        Uploaded
-      </span>
-    );
+    return <Badge variant="outline">Uploaded</Badge>;
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-30">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-        <span className="ml-3 text-slate-600 font-medium">Loading case details...</span>
+      <div className="p-16 flex flex-col items-center justify-center text-xs text-muted-foreground gap-3">
+        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        <span>Loading case workspace...</span>
       </div>
     );
   }
@@ -187,246 +178,199 @@ export default function CaseWorkspacePage() {
   if (!caseDetail) {
     return (
       <div className="p-8 max-w-4xl mx-auto text-center space-y-4">
-        <AlertCircle className="w-12 h-12 text-rose-500 mx-auto" />
-        <h2 className="text-xl font-bold text-slate-900">Case File Not Found</h2>
-        <Link href="/dashboard/cases" className="text-indigo-600 font-semibold hover:underline inline-flex items-center gap-1">
-          <ArrowLeft className="w-4 h-4" /> Return to Case Files
-        </Link>
+        <AlertCircle className="w-12 h-12 text-destructive mx-auto" />
+        <h2 className="text-xl font-bold text-foreground">Case File Not Found</h2>
+        <Button variant="outline" size="sm" onClick={() => router.push("/dashboard/cases")}>
+          <ArrowLeft className="w-3.5 h-3.5 mr-1" /> Return to Case Files
+        </Button>
       </div>
     );
   }
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-6">
-      {/* Top Breadcrumb & Navigation */}
-      <div className="flex items-center justify-between">
-        <Link
-          href="/dashboard/cases"
-          className="text-slate-500 hover:text-slate-900 text-sm font-semibold inline-flex items-center gap-1.5 transition"
-        >
-          <ArrowLeft className="w-4 h-4" /> Back to Case Files
-        </Link>
+    <div className="p-8 lg:p-10 max-w-7xl mx-auto space-y-8">
+      {/* 1. Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-border pb-6">
+        <div>
+          <button
+            onClick={() => router.push("/dashboard/cases")}
+            className="inline-flex items-center text-xs font-semibold text-muted-foreground hover:text-foreground mb-2 gap-1"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Back to Case Files</span>
+          </button>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+              {caseDetail.title}
+            </h1>
+            <Badge variant="outline">
+              {caseDetail.documents?.length || 0} Exhibits
+            </Badge>
+          </div>
+          <p className="text-sm text-muted-foreground mt-1 max-w-3xl">
+            {caseDetail.description || "Litigation matter records under examination."}
+          </p>
+        </div>
 
         <div className="flex items-center gap-3">
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             onClick={fetchCase}
-            className="p-2 rounded-xl text-slate-500 hover:bg-slate-100 transition"
-            title="Refresh case details"
+            className="text-xs"
           >
-            <RefreshCw className="w-4 h-4" />
-          </button>
-          {caseDetail.has_analysis && (
-            <Link
-              href={`/dashboard/cases/${caseId}/results`}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-sm font-bold inline-flex items-center gap-2 shadow-xs transition"
+            <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+            Refresh
+          </Button>
+
+          {caseDetail.has_analysis || caseDetail.status === "analyzed" ? (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => router.push(`/dashboard/cases/${caseId}/results`)}
+              className="text-xs font-semibold"
             >
-              <Sparkles className="w-4 h-4" />
-              View DB Analysis Results
-            </Link>
+              <span>View Case Intelligence & Timeline</span>
+            </Button>
+          ) : (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleTriggerAnalysis}
+              loading={triggering || caseDetail.status === "processing"}
+              className="text-xs font-semibold"
+            >
+              <Play className="w-3.5 h-3.5 mr-1.5" />
+              <span>Trigger Multi-Doc Analysis</span>
+            </Button>
           )}
         </div>
       </div>
 
-      {/* Case Overview Header */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">{caseDetail.title}</h1>
-            <p className="text-sm text-slate-500 mt-1">
-              {caseDetail.description || "No description provided for this case file."}
-            </p>
-          </div>
-          <div className="shrink-0">
-            {caseDetail.status === "analyzed" || caseDetail.has_analysis ? (
-              <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4" /> Analysis Complete
-              </span>
-            ) : caseDetail.status === "processing" ? (
-              <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 inline-flex items-center gap-1.5">
-                <Loader2 className="w-4 h-4 animate-spin" /> Pipeline Running
-              </span>
-            ) : (
-              <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 inline-flex items-center gap-1.5">
-                Awaiting Analysis
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-6 text-xs text-slate-400 font-medium pt-3 border-t border-slate-100">
-          <span>ID: <code className="text-slate-700">{caseDetail.id}</code></span>
-          <span>Created: {new Date(caseDetail.created_at).toLocaleDateString(undefined, { dateStyle: "medium" })}</span>
-          <span>Total Documents: <strong className="text-slate-800">{caseDetail.documents.length}</strong></span>
-        </div>
-      </div>
-
-      {/* Grid: Left - Document Upload & List; Right - Pipeline Trigger Card */}
+      {/* 2. Upload Dropzone & Document Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Left Column (2 spans): Document Upload & Document List */}
-        <div className="lg:col-span-2 space-y-6">
-          
-          {/* Upload Dropzone */}
-          <div
-            onDrop={handleDrop}
-            onDragOver={handleDragOver}
-            className="bg-white border-2 border-dashed border-slate-300 hover:border-indigo-500 transition rounded-2xl p-8 text-center space-y-4 cursor-pointer group"
-            onClick={() => fileInputRef.current?.click()}
-          >
+        <Card className="lg:col-span-2 shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <div>
+              <CardTitle className="text-sm font-semibold">Exhibits & Filings</CardTitle>
+              <CardDescription className="text-xs">
+                Petitions, charge sheets, contracts, and evidentiary attachments
+              </CardDescription>
+            </div>
             <input
               type="file"
               ref={fileInputRef}
-              onChange={(e) => handleFileUpload(e.target.files)}
               accept=".pdf,.jpg,.jpeg,.png,.bmp,.webp"
+              onChange={(e) => handleFileUpload(e.target.files)}
               className="hidden"
             />
-            <div className="w-14 h-14 rounded-2xl bg-indigo-50 group-hover:bg-indigo-100 transition flex items-center justify-center mx-auto text-indigo-600">
-              {uploading ? <Loader2 className="w-7 h-7 animate-spin" /> : <Upload className="w-7 h-7" />}
-            </div>
-            <div>
-              <h3 className="font-bold text-slate-900 text-base">
-                {uploading ? "Uploading document..." : "Click or Drag & Drop Documents"}
-              </h3>
-              <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-                Supports PDF legal filings, FIRs, charge sheets, witness statements, and evidence photos (JPG, PNG).
-              </p>
-            </div>
-          </div>
-
-          {/* Uploaded Documents Table */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                <FileCheck className="w-4 h-4 text-indigo-600" />
-                Case Documents ({caseDetail.documents.length})
-              </h3>
-              <span className="text-xs text-slate-400 font-medium">Auto-parsed on upload</span>
-            </div>
-
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              loading={uploading}
+              className="text-xs"
+            >
+              <Upload className="w-3.5 h-3.5 mr-1.5" />
+              Upload Exhibit
+            </Button>
+          </CardHeader>
+          <CardContent className="p-0">
             {caseDetail.documents.length === 0 ? (
-              <div className="p-8 text-center text-slate-400 text-sm">
-                No documents uploaded yet. Upload PDFs or evidence photos above.
+              <div
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onClick={() => fileInputRef.current?.click()}
+                className="p-12 text-center border-2 border-dashed border-border m-6 rounded-lg cursor-pointer hover:bg-muted/30 transition-colors"
+              >
+                <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                <p className="text-xs font-medium text-foreground">
+                  Drag and drop exhibits here or click to browse
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  PDF, scanned JPEG/PNG supported
+                </p>
               </div>
             ) : (
-              <div className="divide-y divide-slate-100">
-                {caseDetail.documents.map((doc) => (
-                  <div key={doc.id} className="p-4 px-6 flex items-center justify-between gap-4 hover:bg-slate-50 transition">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
-                        {getDocIcon(doc.file_type)}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-bold text-sm text-slate-900 truncate">{doc.name}</p>
-                        <p className="text-xs text-slate-400 font-medium truncate">
-                          {doc.file_type} • Uploaded {new Date(doc.date_created).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="shrink-0 flex items-center gap-3">
-                      {getDocStatusBadge(doc.status)}
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-xs">Document Name</TableHead>
+                    <TableHead className="text-xs">Format</TableHead>
+                    <TableHead className="text-xs">Status</TableHead>
+                    <TableHead className="text-xs">Added On</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {caseDetail.documents.map((doc) => (
+                    <TableRow key={doc.id}>
+                      <TableCell className="font-semibold text-xs text-foreground py-3">
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+                          <span className="truncate max-w-[280px]">{doc.name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground py-3 uppercase">
+                        {doc.file_type?.split("/")[1] || "PDF"}
+                      </TableCell>
+                      <TableCell className="py-3">
+                        {getDocStatusBadge(doc.status)}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground py-3">
+                        {doc.date_created
+                          ? new Date(doc.date_created).toLocaleDateString()
+                          : "Recently"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             )}
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
-        {/* Right Column: Trigger Analysis & Pipeline Banner */}
+        {/* Matter Intelligence & Status Panel */}
         <div className="space-y-6">
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs space-y-5">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 shrink-0">
-                <Sparkles className="w-5 h-5" />
+          <Card className="shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold">Litigation Pipeline</CardTitle>
+              <CardDescription className="text-xs">
+                Multi-agent cross-document ingestion
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 pt-0">
+              <div className="p-3 rounded-md border border-border bg-muted/30 space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-medium text-muted-foreground">OCR & Text Extraction</span>
+                  <Badge variant="success" className="text-[10px]">Active</Badge>
+                </div>
               </div>
-              <div>
-                <h3 className="font-bold text-slate-900 text-base">Case Pipeline Analysis</h3>
-                <p className="text-xs text-slate-500">Multi-Agent Case File Orchestrator</p>
+              <div className="p-3 rounded-md border border-border bg-muted/30 space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-medium text-muted-foreground">Chronological Timeline</span>
+                  <Badge variant="outline" className="text-[10px]">{caseDetail.timeline_count || 0} Events</Badge>
+                </div>
               </div>
-            </div>
+              <div className="p-3 rounded-md border border-border bg-muted/30 space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-medium text-muted-foreground">Cross-Doc Contradictions</span>
+                  <Badge variant="outline" className="text-[10px]">RAG Ready</Badge>
+                </div>
+              </div>
 
-            <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3.5 rounded-xl border border-slate-100">
-              Triggering the analysis pipeline will execute the background <strong>CaseOrchestrator</strong> deep agent loop. It performs multimodal OCR on evidence, extracts chunked text, generates chronological timelines, and compiles a structured legal report in the database.
-            </p>
-
-            <div className="space-y-2">
-              <button
-                onClick={handleTriggerAnalysis}
-                disabled={triggering || caseDetail.status === "processing" || caseDetail.documents.length === 0}
-                className="w-full bg-[#0B1437] hover:bg-[#152458] text-white font-bold py-3.5 px-4 rounded-xl text-sm flex items-center justify-center gap-2 transition shadow-sm disabled:opacity-50"
-              >
-                {triggering || caseDetail.status === "processing" ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Pipeline Running...
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-4 h-4 fill-white" />
-                    Run Multi-Agent Analysis
-                  </>
-                )}
-              </button>
-
-              {caseDetail.documents.length === 0 && (
-                <p className="text-center text-xs text-rose-500 font-medium">
-                  Upload at least one document first.
-                </p>
-              )}
-            </div>
-
-            {caseDetail.has_analysis && (
-              <div className="pt-3 border-t border-slate-100">
-                <Link
-                  href={`/dashboard/cases/${caseId}/results`}
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl text-sm flex items-center justify-center gap-2 transition shadow-xs"
+              {caseDetail.has_analysis && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => router.push(`/dashboard/cases/${caseId}/results`)}
+                  className="w-full text-xs mt-2"
                 >
-                  <Sparkles className="w-4 h-4" />
-                  View Completed Analysis
-                </Link>
-              </div>
-            )}
-          </div>
-
-          {/* Live Agent Thinking & Tool Calling Activity Console */}
-          <div className="bg-slate-900 rounded-2xl p-5 border border-slate-800 shadow-md space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                <h4 className="font-mono text-xs font-bold text-slate-200 uppercase tracking-wider">
-                  Agent Thinking & Tool Execution Log
-                </h4>
-              </div>
-              <span className="text-[10px] font-mono text-slate-400">
-                {agentLogs.length} Events
-              </span>
-            </div>
-
-            <div className="font-mono text-[11px] space-y-2 max-h-[300px] overflow-y-auto pr-1">
-              {agentLogs.length === 0 ? (
-                <p className="text-slate-500 italic py-4 text-center">
-                  {caseDetail.status === "processing"
-                    ? "Agent orchestrator is initializing and analyzing document chunks..."
-                    : "No live agent logs recorded yet. Click 'Run Multi-Agent Analysis' to start."}
-                </p>
-              ) : (
-                agentLogs.map((log: any, idx: number) => (
-                  <div key={idx} className="space-y-0.5 border-b border-slate-800/60 pb-1.5">
-                    <div className="flex items-center justify-between text-[10px] text-slate-400">
-                      <span className="font-bold text-indigo-400">[{log.agent_name || "CaseOrchestrator"}]</span>
-                      <span>{log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : ""}</span>
-                    </div>
-                    <p className={`text-slate-200 break-words ${log.type === 'tool_call' ? 'text-amber-300' : log.type === 'thinking' ? 'text-cyan-300' : 'text-emerald-300'}`}>
-                      <span className="font-bold uppercase text-[10px] opacity-75">[{log.type || "action"}]</span> {log.detail}
-                    </p>
-                  </div>
-                ))
+                  Open Analysis Suite
+                </Button>
               )}
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
-
       </div>
     </div>
   );

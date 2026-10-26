@@ -223,3 +223,256 @@ The `autonomous_legal_advisor` prompt is structured to guide multi-turn investig
 - **Backend Service**: Intelligently redrafts clauses considering original text, analysis risk flags, custom prompt instructions, and bias (Balanced, Client, Counterparty).
 - **Statutory Guardrails**: Automatically remedies non-compete traps under Section 27 ICA and liquidated damage traps under Section 74 ICA.
 - **Frontend Interactive UI**: Added an "Edit & Redraft Clause" button on each analyzed clause card opening a side-by-side comparison modal with live diffs and "Apply Revision to Contract" capability.
+
+---
+
+## 10. Contract Drafting & Generation Module Refactoring: Deterministic LangGraph, Dual Kanoon & Yahoo Scraping, and Real-Time SSE Streaming
+
+### 10.1 Background & Root Causes of Prior Failure
+The contract drafting and generation module (`backend/agents/contract_drafting_orchestrator.py`) previously suffered from severe non-determinism, vagueness, and opacity:
+1. **Unconstrained & Vague ReAct Coordination**: Built on `deepagents.create_deep_agent`, the coordinator LLM decided subagent calls arbitrarily. It often skipped structural analysis, hallucinated legal research, or produced incomplete contracts with placeholder leakage (e.g. `[Insert standard indemnification clause]`).
+2. **Brittle File-Based State Coordination**: State was dumped into virtual filesystem markdown files (`/memories/drafting_memory.md`, `/memories/drafted_contract.md`). Dropped tool calls broke downstream context.
+3. **Hardcoded Statutory Text (Zero Genuine Research)**: The system previously relied on hardcoded dictionaries (`_CANONICAL_STATUTE_GUIDELINES`) rather than dynamically discovering, searching, and scraping relevant laws.
+4. **Frontend Black Box (Fake Timer)**: The frontend (`tenant-files/page.tsx`) submitted a Celery task and spun on a fake 1.8-second timer (`loadingStep`) rotating through 5 static strings, completely disconnected from backend execution.
+
+---
+
+### 10.2 New Architecture: Deterministic LangGraph Drafting Engine
+
+The drafting pipeline was refactored into a compiled **`StateGraph(ContractDraftingGraphState)`** in [`backend/agents/contract_drafting_langgraph.py`](file:///d:/My_Space/MajorProject/backend/agents/contract_drafting_langgraph.py):
+
+```
+                                      [START]
+                                         │
+                                         ▼
+                             ┌───────────────────────┐
+                             │ node_intake_blueprint │  (Resolves mode: template, reiteration,
+                             └───────────────────────┘   or prompt_only; identifies parties)
+                                         │
+                                         ▼
+                             ┌───────────────────────┐
+                             │node_structure_extract │  (Constructs comprehensive section
+                             └───────────────────────┘   blueprint matching Indian legal practice)
+                                         │
+                                         ▼
+                             ┌───────────────────────┐
+                             │node_autonomous_legal_ │  (AUTONOMOUS DUAL SEARCH: Searches Indian
+                             │       research        │   Kanoon Direct + Yahoo Legal Index live)
+                             └───────────────────────┘
+                                         │
+                                         ▼
+                             ┌───────────────────────┐
+                             │  node_section_writer  │  (Iterative drafter: Synthesizes formal
+                             └───────────────────────┘   clauses incorporating scraped authorities)
+                                         │
+                                         ▼
+                             ┌───────────────────────┐
+                             │node_compliance_review │  (Audits draft against Sec 27, 74, 28 ICA,
+                             └───────────────────────┘   Arbitration Act 1996, & empty placeholders)
+                                         │
+                                         ▼
+                               ┌───────────────────┐
+                               │  Verdict Approved │
+                               │  or Turns >= 2?   │
+                               └───────────────────┘
+                                  │             │
+                          (Revise)│             │(Approved or Max Turns)
+                                  ▼             ▼
+                       ┌───────────────────┐  ┌───────────────────────┐
+                       │node_targeted_revis│  │  node_final_assembly  │
+                       └───────────────────┘  └───────────────────────┘
+                                  │                         │
+                                  └─────────►               ▼
+                                                         [END]
+```
+
+#### Deterministic Spine & Bounded Loops:
+* **Stage 1 (Intake Blueprint)**: Resolves execution mode (`template`, `reiteration`, `prompt_only`), party identities, and contract title.
+* **Stage 2 (Structure Mapping)**: Formulates an exhaustive section blueprint with categories (Preamble, Definitions, Commercial, Protective, Boilerplate, Execution).
+* **Stage 3 (Autonomous Legal Research)**: Deduces applicable Indian statutes and executes live dual-engine legal research.
+* **Stage 4 (Section Writer)**: Sequentially drafts formal legal clauses grounded in the scraped legal findings. Under reiteration mode, it re-drafts only affected sections.
+* **Stage 5 (Compliance Reviewer)**: Audits the compiled draft against Indian statutory mandates (Section 27 restraint of trade, Section 74 penalties vs damages, Section 28 limitations, and *Perkins Eastman* sole-arbitrator prohibitions).
+* **Stage 6 (Targeted Reviser & Assembly)**: If compliance issues are detected, it enters a targeted revision cycle strictly capped at **2 iterations** before finalizing and formatting the contract.
+
+---
+
+### 10.3 Dual Legal Research Engine: Indian Kanoon Direct + Yahoo (DDGS)
+
+All hardcoded statutory dictionaries were deleted from [`backend/tools/indian_kanoon_tools.py`](file:///d:/My_Space/MajorProject/backend/tools/indian_kanoon_tools.py). The system now conducts **live dual-engine search and web scraping**:
+
+```
+                   ┌────────────────────────────────────────────────────────┐
+                   │        Targeted Indian Legal Research Query            │
+                   └──────────────────┬───────────────────┬─────────────────┘
+                                      │                   │
+                                      ▼                   ▼
+                 ┌─────────────────────────────┐ ┌─────────────────────────────┐
+                 │  Method 1: Direct Kanoon    │ │  Method 2: Yahoo (DDGS)     │
+                 │  https://indiankanoon.org/  │ │  backend='yahoo'            │
+                 │  search/?formInput=...      │ │  site:indiankanoon.org ...  │
+                 └──────────────┬──────────────┘ └──────────────┬──────────────┘
+                                │                               │
+                                └──────────────┬────────────────┘
+                                               ▼
+                              ┌──────────────────────────────────┐
+                              │  Deduplicate by Doc ID & Merge   │
+                              │  Tagging Engine Origin           │
+                              └────────────────┬─────────────────┘
+                                               ▼
+                              ┌──────────────────────────────────┐
+                              │ Live Scrape Full Statutory Text  │
+                              │ & Ratio (indiankanoon.org/doc/X) │
+                              └──────────────────────────────────┘
+```
+
+1. **Method 1: Direct Indian Kanoon Route (`search_via_kanoon_route`)**:
+   - Queries `https://indiankanoon.org/search/?formInput={query}` directly with modern browser headers.
+   - Parses `<article class="result">` and extracts case law links and Document IDs.
+   - Tagged as `Source Engine: Indian Kanoon Direct`.
+2. **Method 2: Yahoo Legal Index via DDGS (`search_via_ddgs`)**:
+   - Executes `DDGS(timeout=10).text(..., backend="yahoo")` with concise candidate queries (`site:indiankanoon.org <keywords>` and `indian kanoon <keywords>`).
+   - Discovers indexed statutory enactments, section definitions, and legal commentaries.
+   - Tagged as `Source Engine: Yahoo Legal Index (DDGS)`.
+3. **Doc ID Extraction & Web Scraping**:
+   - Extracts numeric document identifiers via regex (`/doc(?:fragment)?/(\d+)`).
+   - `fetch_kanoon_document_raw` downloads the canonical `https://indiankanoon.org/doc/{doc_id}/` page, decomposes ads/scripts/menus, and extracts the Court, Bench, Date, and verbatim ratio decidendi.
+
+#### Verified Live Output (Query: `Section 27 Indian Contract Act restraint of trade`):
+* **Indian Kanoon Direct**: *Wipro Limited vs Beckman Coulter* (Doc ID `647033`), *199th Law Commission Report on Unfair Terms* (Doc ID `140848451`), *Percept D'Mark vs Zaheer Khan* (Doc ID `571375`).
+* **Yahoo Legal Index (DDGS)**: *Section 27 in The Indian Contract Act, 1872* statutory text (Doc ID `1431516`), *Section 26 ICA* (Doc ID `1269245`).
+
+---
+
+### 10.4 Real-Time Event Bus & Server-Sent Events (SSE)
+
+To replace blind waiting and fake timers, an event streaming architecture was deployed:
+* **Broadcaster Service (`backend/services/drafting_stream_service.py`)**:
+  - Broadcasts structured JSON events to Redis Pub/Sub channel `draft_stream:{doc_id}`.
+  - Persists an event history list in Redis `draft_events:{doc_id}` with a 24-hour TTL, ensuring late-joining frontends or refreshed pages instantly replay the entire drafting timeline.
+  - Generates standard SSE formatting (`data: {...}\n\n`) with periodic keep-alive comments (`: ping\n\n`).
+* **FastAPI Streaming Endpoints (`backend/routes/contracts.py`)**:
+  - `GET /api/v1/contracts/{document_id}/draft/stream`: Direct SSE stream via `StreamingResponse(media_type="text/event-stream")`.
+  - `GET /api/v1/contracts/{document_id}/draft/events`: REST polling fallback returning the cached event array.
+  - `GET /api/v1/contracts/{document_id}/draft/logs`: Execution trace logs.
+* **Celery Background Integration (`backend/tasks/drafting_tasks.py`)**:
+  - Updated `run_agent_drafting_task` and `run_agent_reiteration_task` to instantiate `ContractDraftingLangGraphRunner`, publishing progress at every node transition.
+
+---
+
+### 10.5 Frontend Real-Time Console (`DraftingStreamConsole.tsx`)
+
+A dedicated streaming component was built and mounted in [`frontend/app/dashboard/tenant-files/page.tsx`](file:///d:/My_Space/MajorProject/frontend/app/dashboard/tenant-files/page.tsx):
+* **6-Stage Visual Stepper**:
+  1. `Blueprint & Intake` (10% - 18%)
+  2. `Structure Mapping` (25% - 35%)
+  3. `Kanoon & Yahoo Legal Research` (40% - 52%)
+  4. `Autonomous Clause Drafting` (55% - 75%)
+  5. `Compliance Review & Audit` (80% - 90%)
+  6. `Final Assembly` (95% - 100%)
+* **Live Activity Terminal**:
+  - Streams real-time legal queries, scraped Kanoon Document IDs, section titles being drafted, and reviewer audit scores.
+* **Auto-Transition & Reconnection**:
+  - When `is_complete` is received, it automatically triggers `fetchContractData()` and transitions seamlessly into the document editor.
+  - Automatically falls back to REST polling if the SSE stream encounters network interruptions.
+
+---
+
+### 10.6 Summary of Created & Modified Files
+
+| File Path | Action | Description |
+| :--- | :--- | :--- |
+| `backend/tools/indian_kanoon_tools.py` | **Modified** | Purged all hardcoded statutory lookup tables; implemented dual-engine search (`search_via_kanoon_route` + `search_via_ddgs` with `backend='yahoo'`); added live HTML document scraper `fetch_kanoon_document_raw`. |
+| `backend/services/drafting_stream_service.py` | **Created** | Redis Pub/Sub event broadcaster (`draft_stream:{doc_id}`) with 24h event history cache (`draft_events:{doc_id}`) and async SSE generator with keep-alive pings. |
+| `backend/agents/contract_drafting_langgraph.py` | **Created** | Full 6-stage deterministic LangGraph drafting state machine with bounded legal research and revision loops. |
+| `backend/agents/contract_drafting_orchestrator.py` | **Refactored** | Removed legacy DeepAgents boilerplate; cleanly exports `ContractDraftingLangGraphRunner` and backward-compatible factories. |
+| `backend/tasks/drafting_tasks.py` | **Modified** | Updated Celery drafting and reiteration tasks to run the LangGraph runner with real-time Redis streaming. |
+| `backend/routes/contracts.py` | **Modified** | Added `GET /{document_id}/draft/stream` (SSE), `GET /{document_id}/draft/events`, and `GET /{document_id}/draft/logs`; added markdown code fence sanitization on draft retrieval. |
+| `frontend/app/dashboard/tenant-files/page.tsx` | **Modified** | Added `cleanMarkdownForRendering()` to eliminate backtick code blocks; deduplicated `<h1>` titles; supported dynamic `targetId` contract loading. |
+| `frontend/components/dashboard/DraftingStreamConsole.tsx` | **Modified** | Added live SSE and polling milestone timeline, terminal stream, and `onComplete(activeDocId)` handover. |
+| `frontend/app/globals.css` | **Modified** | Added polished legal contract typography for `.contract-markdown.markdown-body` (headings, lists, spacing, tables). |
+| `docs/progress_tracker.md` | **Updated** | Recorded Section 10 documenting the complete contract drafting refactoring, dual legal scraping engine, real-time streaming pipeline, and legal rendering bug fixes. |
+
+---
+
+### 10.7 Bug Fix & Hardening: Prompt-Only Document ID Resolution & Console Rendering
+
+#### Incident & Symptoms:
+When submitting a prompt-only contract drafting request from `/dashboard/templates`, the backend terminal showed:
+```text
+INFO: 127.0.0.1:61002 - "GET /api/v1/contracts/undefined/process/status/ea84bee8-0b8b-411c-a30a-aac777cfb0e7 HTTP/1.1" 404 Not Found
+```
+Meanwhile, the Celery background worker was actively executing Kanoon and Yahoo scraping:
+```text
+[KANOON_SEARCH (47%)] Querying Indian Kanoon & Yahoo Legal Index (3/4): 'Specific Relief Act, 1963...'
+[KANOON_SCRAPE (49%)] Scraping statutory text & ratio for Kanoon Doc ID: 1028815...
+```
+However, the user's browser did not display the live streaming console ("working still not shown").
+
+#### Root Cause Analysis:
+1. **Schema Field Omission**: In `backend/routes/contracts.py`, `create_draft_contract_endpoint` created the new database document record, queued the Celery task, but returned `TaskSubmitResponse` which omitted `document_id`.
+2. **URL Routing `undefined` Propagation**: `frontend/app/dashboard/templates/page.tsx` read `draftRes.document_id`, which was `undefined`, and routed to `/dashboard/tenant-files?generating=true&drafting=true&prompt=...&id=undefined&task_id=...`.
+3. **Frontend Guard Blocking**: In `frontend/app/dashboard/tenant-files/page.tsx`, the component checked `if (isGenerating && contractId)`. Because `contractId` evaluated to `null` or the string `"undefined"`, the check blocked `DraftingStreamConsole` from rendering and fell through to the blank document editor while polling `/contracts/undefined/process/status/...` which threw 404s.
+
+#### Solutions Implemented:
+1. **Schema & Endpoint Updates**:
+   - Added `document_id: Optional[str] = None` to both `TaskSubmitResponse` and `TaskStatusResponse` in `backend/schemas/task_schemas.py`.
+   - Updated `create_draft_contract_endpoint`, `draft_contract_endpoint`, and `draft_contract_agent_only_endpoint` in `backend/routes/contracts.py` to always return `document_id=document.id`.
+2. **Resilient Status Endpoint (`/process/status`)**:
+   - Modified `get_processing_status` in `backend/routes/contracts.py` so that if `document_id in ("undefined", "null", "")`, it does **not** fail with 404; instead, it inspects Celery's `AsyncResult(task_id)` directly, extracts `document_id` from the task metadata, and returns HTTP 200 with the resolved `document_id`.
+3. **Frontend Routing & Template Fix**:
+   - Updated `frontend/app/dashboard/templates/page.tsx` to safely resolve `draftRes.document_id || draftRes.id` before routing.
+4. **Console Rendering & Dynamic ID Resolution**:
+   - Updated `frontend/app/dashboard/tenant-files/page.tsx` to sanitize `contractId` (ignoring string `"undefined"` / `"null"`), render `DraftingStreamConsole` whenever `isGenerating` is true, and automatically resolve `contractId` from `taskId`.
+   - Updated `frontend/components/dashboard/DraftingStreamConsole.tsx` to maintain `activeDocId` and automatically query task status to obtain the real `document_id` and connect to the SSE stream.
+
+---
+
+### 10.8 Bug Fix & UI Hardening: Contract Markdown Rendering, Typography & Dynamic ID Handover
+
+#### Incident & Symptoms:
+When accessing the tenant-files editor with URL:
+```text
+http://localhost:3000/dashboard/tenant-files?generating=true&drafting=true&prompt=Draft+a+comprehensive+Master+Software+Development+and+Services+Agreement...&id=undefined&task_id=ea84bee8-0b8b-411c-a30a-aac777cfb0e7
+```
+The generated Master Services Agreement was displayed inside a monospace preformatted code block card (`<pre><code>`) with raw Markdown tokens (`## 1. Preamble and Recitals`, `**1.1. Introduction**`, `- **Apex HealthTech Solutions...**`) instead of formatted legal typography. A blinking text cursor was trapped inside the raw code block and a redundant duplicate title header was shown.
+
+#### Root Cause Analysis:
+1. **Code Fence Artifacts from LLM Specialist Writer**:
+   - During autonomous section drafting in `backend/agents/contract_drafting_langgraph.py`, the LLM wrapped sections within Markdown code fences (`` ```markdown ... ``` `` or `` ``` ... ``` ``).
+   - When assembled via `"\n\n---\n\n".join(sections)`, the document retained opening and closing backtick fences for all 12 sections.
+2. **Markdown Parser Code Block Conversion**:
+   - In `frontend/app/dashboard/tenant-files/page.tsx`, `marked.parse(content)` processed the code fences as HTML `<pre><code>` blocks.
+   - Under `github-markdown-light.css` and `.contract-markdown.markdown-body pre`, the browser rendered each section as a bordered monospace box, preventing headings, bold party names, and lists from rendering.
+3. **Duplicate Title Header**:
+   - `DocumentEditor` unconditionally rendered `<h1 className="text-[32px] ...">{contract?.original_filename}</h1>`.
+   - Because the drafted Markdown already contained `# MASTER SERVICES AGREEMENT...`, a duplicate header was displayed.
+4. **Missing Handover of Resolved Document ID**:
+   - When `id=undefined` was passed in query params, `DraftingStreamConsole` correctly resolved `activeDocId` via task status, but `onComplete()` did not forward `activeDocId` back to `TenantFilesPage`. As a result, the parent component could experience a delay or closure mismatch in fetching the newly drafted contract.
+
+#### Solutions Implemented:
+1. **Backend Agent Hardening (`contract_drafting_langgraph.py`)**:
+   - Added `strip_markdown_code_fences()` helper using regex to purge standalone lines containing backtick fences (`^[ \t]*```[a-zA-Z0-9_-]*[ \t]*$`).
+   - Updated `node_section_writer`, `node_targeted_reviser`, and `node_final_assembly` to enforce raw Markdown output and clean all sections before persisting to disk and memories.
+2. **Route-Level Sanitization (`backend/routes/contracts.py`)**:
+   - Hardened the `get_document` endpoint to sanitize `_drafted_contract.md` before returning `analysis_markdown` to API consumers.
+3. **Disk & Memory Storage Cleanup**:
+   - Sanitized existing draft and memory files for document `cf32d9ba-ec9f-426d-a399-1421e28cfad7` (task `ea84bee8-0b8b-411c-a30a-aac777cfb0e7`), eliminating all code fence lines.
+4. **Frontend Markdown Sanitization & Title Deduplication (`tenant-files/page.tsx`)**:
+   - Added `cleanMarkdownForRendering()` to remove any residual backtick fences prior to calling `marked.parse()`.
+   - Updated `DocumentEditor` with a `hasH1InContent` check (`/^\s*<h1[\s>]/i.test(htmlContent)`), preventing duplicate fallback headers when the Markdown includes a top-level `#` title.
+   - Enhanced `fetchContractData(isPolling, targetId)` to accept a target ID and immediately load the resolved document.
+5. **Console Document ID Handover (`DraftingStreamConsole.tsx`)**:
+   - Updated `onComplete` in `DraftingStreamConsoleProps` to accept `(resolvedDocId?: string) => void`.
+   - Both SSE completion and REST polling completion now invoke `onComplete(activeDocId)`.
+   - `TenantFilesPage` receives the resolved document ID, sets `contractId`, triggers `fetchContractData(false, finalId)`, and updates the browser URL to `id={finalId}&generated=true`.
+6. **Professional Legal Typography (`globals.css`)**:
+   - Enhanced `.contract-markdown.markdown-body` styling:
+     - `h1`: 26px bold navy (`#0b1437`) with 2px bottom border.
+     - `h2`: 18px bold navy with 1px bottom border and 36px top margin.
+     - `h3`: 15px bold slate-900 with 24px top margin.
+     - `p`: 15px readable text with 1.8 line height and 16px bottom margin.
+     - `strong`: 600 weight navy for contracting entities and statutory references.
+     - `ul`/`ol`/`li`: Proper padding, indentation, and list spacing.
+     - `table`: Full-width bordered legal tables for consideration milestones and payment terms.
+
+

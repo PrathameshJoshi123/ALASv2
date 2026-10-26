@@ -13,6 +13,7 @@ class TaskSubmitResponse(BaseModel):
     task_id: str = Field(..., description="Unique task ID")
     status: str = Field(..., description="Task status")
     message: str = Field(..., description="Status message")
+    document_id: Optional[str] = Field(None, description="Target or created document ID")
 
 
 class TaskStatusResponse(BaseModel):
@@ -23,6 +24,7 @@ class TaskStatusResponse(BaseModel):
     result: Optional[Any] = Field(None, description="Task result if completed")
     state: str = Field(..., description="Task state")
     successful: bool = Field(..., description="Whether task completed successfully")
+    document_id: Optional[str] = Field(None, description="Associated document ID")
 
 
 class TaskResultResponse(BaseModel):

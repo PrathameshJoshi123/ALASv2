@@ -36,13 +36,15 @@ import logging
 logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
 
 # Create sync engine
-engine = create_engine(
-    database_url,
-    echo=False,
-    pool_pre_ping=True,
-    pool_size=5,
-    max_overflow=10,
-)
+engine_kwargs = {
+    "echo": False,
+    "pool_pre_ping": True,
+}
+if not database_url.startswith("sqlite"):
+    engine_kwargs["pool_size"] = 5
+    engine_kwargs["max_overflow"] = 10
+
+engine = create_engine(database_url, **engine_kwargs)
 
 # Enable foreign keys for SQLite
 if database_url.startswith("sqlite"):
@@ -109,6 +111,11 @@ def init_db() -> None:
         create_tables_if_not_exist()
     except Exception as e:
         print(f"Warning: automatic schema migration check failed: {e}")
+    try:
+        from backend.database_migrations.create_phase1_migration_tables import create_phase1_tables_if_not_exist
+        create_phase1_tables_if_not_exist()
+    except Exception as e:
+        print(f"Warning: phase 1 schema migration check failed: {e}")
     print("Database tables created and initialized successfully.")
 
 

@@ -297,17 +297,43 @@ def apply_clause_revision_to_db(
                 updated = True
                 break
 
-        # Also update drafted_contract.md if present
-        from pathlib import Path
-        draft_file = Path("backend/storage/outputs") / f"{document_id}_drafted_contract.md"
-        if draft_file.exists() and target_orig_text:
-            try:
+        # Also update relational ContractClause table
+        try:
+            from backend.models.contract_analysis import ContractClause
+            clause_stmt = select(ContractClause).where(
+                ContractClause.document_id == document_id,
+                (ContractClause.id == str(clause_id)) | (ContractClause.clause_number == int(clause_id) if str(clause_id).isdigit() else False),
+            )
+            db_clause = db.execute(clause_stmt).scalar_one_or_none()
+            if db_clause:
+                if not target_orig_text:
+                    target_orig_text = db_clause.raw_text
+                db_clause.original_raw_text = target_orig_text
+                db_clause.raw_text = revised_text
+                db_clause.severity = "REVISED_SAFE"
+                db_clause.is_revised = True
+                db_clause.revision_rationale = rationale
+                db_clause.revised_at = datetime.utcnow()
+                updated = True
+        except Exception as cl_err:
+            logger.warning(f"Could not update ContractClause row for {document_id}: {cl_err}")
+
+        # Update drafted contract in the database
+        from backend.services.contract_draft_service import replace_text_in_draft
+        if target_orig_text:
+            replace_text_in_draft(document_id, target_orig_text, revised_text)
+
+        # Optional cache sync for drafted_contract.md if present on disk
+        try:
+            from pathlib import Path
+            draft_file = Path("backend/storage/outputs") / f"{document_id}_drafted_contract.md"
+            if draft_file.exists() and target_orig_text:
                 curr_content = draft_file.read_text(encoding="utf-8")
                 if target_orig_text in curr_content:
                     new_content = curr_content.replace(target_orig_text, revised_text, 1)
                     draft_file.write_text(new_content, encoding="utf-8")
-            except Exception as ex:
-                logger.warning(f"Could not update drafted contract file for {document_id}: {ex}")
+        except Exception as ex:
+            logger.warning(f"Could not update drafted contract cache file for {document_id}: {ex}")
 
         if updated:
             # Recompute issue counts
@@ -338,16 +364,21 @@ def apply_clause_revision_to_db(
 
 def save_contract_content(document_id: str, content: str) -> Dict[str, Any]:
     """
-    Saves the user edited contract markdown directly to backend/storage/outputs/{document_id}_drafted_contract.md.
+    Saves the user edited contract markdown directly to the database.
+    Also syncs to disk for cache/backward compatibility.
     """
-    from pathlib import Path
-    out_dir = Path("backend/storage/outputs")
-    out_dir.mkdir(parents=True, exist_ok=True)
-    file_path = out_dir / f"{document_id}_drafted_contract.md"
-    file_path.write_text(content, encoding="utf-8")
-    return {
-        "status": "success",
-        "message": "Contract saved successfully.",
-        "document_id": document_id,
-    }
+    from backend.services.contract_draft_service import update_draft_content
+    db_result = update_draft_content(document_id, content)
+
+    # Optional local file sync for legacy compatibility
+    try:
+        from pathlib import Path
+        out_dir = Path("backend/storage/outputs")
+        out_dir.mkdir(parents=True, exist_ok=True)
+        file_path = out_dir / f"{document_id}_drafted_contract.md"
+        file_path.write_text(content, encoding="utf-8")
+    except Exception as ex:
+        logger.warning(f"Could not write cache file for {document_id}: {ex}")
+
+    return db_result
 

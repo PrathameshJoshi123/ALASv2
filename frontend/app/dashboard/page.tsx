@@ -1,320 +1,316 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
-  UploadCloud,
-  FileText,
-  FileSearch,
-  XCircle,
-  RefreshCcw,
-  ExternalLink,
+  ShieldAlert,
+  PenTool,
+  FolderKanban,
+  ArrowRight,
   Plus,
+  FileText,
+  Clock,
+  CheckCircle2,
+  AlertTriangle,
   Loader2,
+  TrendingUp,
+  FileCheck,
 } from "lucide-react";
 import { apiClient } from "@/services/api";
-import toast from "react-hot-toast";
-import { useRouter } from "next/navigation";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-export default function DashboardPage() {
+export default function ExecutiveDashboard() {
   const router = useRouter();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [contracts, setContracts] = useState<any[]>([]);
-  const [fetching, setFetching] = useState(true);
-  const [uploading, setUploading] = useState(false);
-
-  const fetchContracts = async () => {
-    try {
-      setFetching(true);
-      const data = await apiClient.getContracts(1, 10);
-      const items = Array.isArray(data) ? data : (data?.items || []);
-      setContracts(items);
-    } catch (error) {
-      console.error("Failed to fetch contracts", error);
-    } finally {
-      setFetching(false);
-    }
-  };
+  const [cases, setCases] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchContracts();
+    async function loadDashboardData() {
+      try {
+        setLoading(true);
+        const [contractsRes, casesRes] = await Promise.allSettled([
+          apiClient.getContracts(1, 5),
+          apiClient.getCases(),
+        ]);
+
+        if (contractsRes.status === "fulfilled") {
+          const items = Array.isArray(contractsRes.value)
+            ? contractsRes.value
+            : contractsRes.value?.items || [];
+          setContracts(items.slice(0, 5));
+        }
+
+        if (casesRes.status === "fulfilled") {
+          const caseItems = Array.isArray(casesRes.value) ? casesRes.value : [];
+          setCases(caseItems.slice(0, 5));
+        }
+      } catch (err) {
+        console.error("Error loading dashboard data", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadDashboardData();
   }, []);
 
-  const handleFileSelect = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.size > 50 * 1024 * 1024) {
-      toast.error("File size exceeds 50MB limit.");
-      return;
+  const getStatusBadge = (status: string) => {
+    switch (status?.toUpperCase()) {
+      case "COMPLETED":
+      case "ANALYZED":
+        return <Badge variant="success">Completed</Badge>;
+      case "PROCESSING":
+      case "ANALYZING":
+        return <Badge variant="info">In Review</Badge>;
+      case "FAILED":
+        return <Badge variant="destructive">Action Required</Badge>;
+      default:
+        return <Badge variant="outline">{status || "Pending"}</Badge>;
     }
-
-    setUploading(true);
-    const uploadToast = toast.loading("Uploading and initiating analysis...");
-
-    try {
-      await apiClient.uploadContract(file, {
-        counterparty_name: "TBD",
-        contract_type: "NDA",
-      });
-      toast.success("Contract uploaded successfully!", { id: uploadToast });
-      fetchContracts();
-    } catch (error: any) {
-      console.error("Upload failed", error);
-      toast.error(error.response?.data?.detail || "Failed to upload contract", {
-        id: uploadToast,
-      });
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  };
-
-  const handleViewDetails = (contractId: string) => {
-    router.push(`/dashboard/contracts/${contractId}`);
   };
 
   return (
-    <div className="p-10 lg:p-14 max-w-[1200px]">
-      <input
-        type="file"
-        className="hidden"
-        ref={fileInputRef}
-        onChange={handleFileUpload}
-        accept=".pdf"
-      />
-
-      {/* Header */}
-      <div className="mb-10">
-        <p className="text-[10px] font-bold tracking-[0.15em] text-slate-400 uppercase mb-3">
-          Dashboard / Analytics
-        </p>
-        <h1 className="text-[32px] font-bold text-slate-900 tracking-tight mb-4">
-          Contract Repository
-        </h1>
-        <p className="text-[14px] text-slate-500 max-w-[700px] leading-relaxed">
-          Securely upload and analyze your legal documents. Our AI engine scans
-          for liability shifts, term inconsistencies, and regulatory compliance
-          in seconds.
-        </p>
-      </div>
-
-      <div className="flex flex-col xl:flex-row gap-8 mb-16 relative">
-        <div className="flex-1 bg-[#F9FAFC] border-[2px] border-dashed border-[#E2E8F0] rounded-[24px] p-12 lg:p-20 flex flex-col items-center justify-center text-center">
-          <div className="w-16 h-16 bg-[#E0E7FF] rounded-2xl flex items-center justify-center mb-6">
-            {uploading ? (
-              <Loader2
-                className="w-8 h-8 text-[#0B1437] animate-spin"
-                strokeWidth={2.5}
-              />
-            ) : (
-              <UploadCloud
-                className="w-8 h-8 text-[#0B1437]"
-                strokeWidth={2.5}
-              />
-            )}
+    <div className="p-8 lg:p-10 max-w-7xl mx-auto space-y-8">
+      {/* 1. Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-border pb-6">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+            <span>Executive Command Center</span>
           </div>
-          <h2 className="text-[22px] font-bold text-slate-900 mb-2">
-            {uploading ? "Analyzing document..." : "Drop contract to analyze"}
-          </h2>
-          <p className="text-[13px] text-slate-500 mb-8 font-medium">
-            Support for PDF and TXT (Max 50MB)
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            Legal Operations Overview
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Unified workspace for contract analysis, autonomous drafting, and multi-document litigation files.
           </p>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={handleFileSelect}
-              disabled={uploading}
-              className="bg-[#0B1437] text-white px-6 py-3.5 rounded-lg text-[13px] font-bold flex items-center justify-center gap-2 hover:bg-[#152355] transition shadow-md disabled:bg-slate-400"
-            >
-              <Plus className="w-4 h-4" />
-              Select Files
-            </button>
-            <button className="bg-white text-slate-700 border border-slate-200 px-6 py-3.5 rounded-lg text-[13px] font-bold flex items-center justify-center hover:bg-slate-50 transition shadow-sm">
-              Connect Drive
-            </button>
-          </div>
         </div>
-
-        <div className="w-full xl:w-[320px] shrink-0 xl:-mr-12 xl:mt-8 z-10 transition-transform hover:-translate-y-1">
-          <div className="bg-gradient-to-br from-[#E8EFFF] to-[#D5E1FB] rounded-[24px] p-6 shadow-[0_20px_40px_rgba(59,95,229,0.15)] border border-white">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-[13px] font-bold text-[#1E3A8A]">
-                System Health
-              </h3>
-              <div className="w-2 h-2 rounded-full bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.8)]"></div>
-            </div>
-
-            <div className="space-y-3 mb-4">
-              <div className="bg-white/90 backdrop-blur-sm rounded-xl p-4 shadow-sm border border-white/50">
-                <p className="text-[9px] font-bold tracking-widest text-[#1E3A8A] opacity-60 uppercase mb-1">
-                  Weekly Accuracy
-                </p>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-[24px] font-bold text-slate-900">
-                    99.4%
-                  </span>
-                  <span className="text-[11px] font-bold text-green-500">
-                    +0.2%
-                  </span>
-                </div>
-              </div>
-              <div className="bg-white/90 backdrop-blur-sm rounded-xl p-4 shadow-sm border border-white/50">
-                <p className="text-[9px] font-bold tracking-widest text-[#1E3A8A] opacity-60 uppercase mb-1">
-                  Average Turnaround
-                </p>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-[24px] font-bold text-slate-900">
-                    14s
-                  </span>
-                  <span className="text-[11px] font-bold text-slate-400">
-                    Real-time
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="h-20 bg-gradient-to-t from-slate-800 to-slate-600 rounded-xl overflow-hidden relative mt-4 shadow-inner opacity-90">
-              <div className="absolute bottom-0 left-0 right-0 h-full bg-blue-300/10 mix-blend-overlay"></div>
-              <svg
-                className="absolute inset-0 w-full h-full text-white/30"
-                preserveAspectRatio="none"
-                viewBox="0 0 100 100"
-                fill="none"
-              >
-                <path
-                  d="M0,100 Q10,70 20,80 T40,60 T60,50 T80,20 T100,40 L100,100 Z"
-                  fill="currentColor"
-                  opacity="0.1"
-                />
-                <path
-                  d="M0,80 Q20,60 40,70 T80,30 T100,10"
-                  stroke="rgba(255,255,255,0.7)"
-                  strokeWidth="1.5"
-                  fill="none"
-                />
-                <path
-                  d="M0,85 Q20,70 40,75 T80,40 T100,30"
-                  stroke="rgba(255,255,255,0.2)"
-                  strokeWidth="1"
-                  fill="none"
-                />
-              </svg>
-            </div>
-          </div>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            onClick={() => router.push("/dashboard/analysis/upload")}
+            className="text-xs"
+          >
+            <Plus className="w-3.5 h-3.5 mr-1.5" />
+            Upload Contract
+          </Button>
+          <Button
+            variant="default"
+            onClick={() => router.push("/dashboard/drafting")}
+            className="text-xs"
+          >
+            <PenTool className="w-3.5 h-3.5 mr-1.5" />
+            Draft New Agreement
+          </Button>
         </div>
       </div>
 
-      <div>
-        <h3 className="text-[18px] font-bold text-slate-900 mb-6 tracking-tight">
-          Recent Analysis
-        </h3>
-        <div className="bg-white rounded-[20px] shadow-sm border border-slate-100 overflow-hidden">
-          {fetching ? (
-            <div className="p-20 flex flex-col items-center justify-center gap-4">
-              <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-              <p className="text-slate-500 font-medium">
-                Loading repository...
-              </p>
+      {/* 2. Core Legal Workflow Launchpads */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Pillar 1: Contract Analysis */}
+        <Card className="hover:border-slate-400/80 transition-all shadow-sm flex flex-col justify-between">
+          <CardHeader>
+            <div className="w-10 h-10 rounded-md bg-blue-50 border border-blue-200/60 text-blue-700 flex items-center justify-center mb-2">
+              <ShieldAlert className="w-5 h-5" />
             </div>
-          ) : contracts.length === 0 ? (
-            <div className="p-20 text-center">
-              <FileText className="w-12 h-12 text-slate-200 mx-auto mb-4" />
-              <p className="text-slate-500 font-medium">
-                No contracts found. Upload your first document above.
-              </p>
+            <CardTitle className="text-base">Contract Analysis</CardTitle>
+            <CardDescription className="text-xs">
+              Upload agreements to extract liabilities, classify clauses, and detect Section 27/74 ICA violations via Indian Kanoon research.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <Link
+              href="/dashboard/analysis"
+              className="inline-flex items-center text-xs font-semibold text-accent hover:underline gap-1"
+            >
+              <span>Explore Analysis Repository</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </CardContent>
+        </Card>
+
+        {/* Pillar 2: Contract Drafting */}
+        <Card className="hover:border-slate-400/80 transition-all shadow-sm flex flex-col justify-between">
+          <CardHeader>
+            <div className="w-10 h-10 rounded-md bg-emerald-50 border border-emerald-200/60 text-emerald-700 flex items-center justify-center mb-2">
+              <PenTool className="w-5 h-5" />
             </div>
-          ) : (
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-slate-100">
-                  <th className="px-8 py-5 text-[10px] font-bold tracking-widest text-slate-400 uppercase w-1/3">
-                    Document Name
-                  </th>
-                  <th className="px-8 py-5 text-[10px] font-bold tracking-widest text-slate-400 uppercase w-1/6">
-                    Upload Date
-                  </th>
-                  <th className="px-8 py-5 text-[10px] font-bold tracking-widest text-slate-400 uppercase w-[15%]">
-                    Status
-                  </th>
-                  <th className="px-8 py-5 text-right w-1/3"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {contracts.map((doc) => (
-                  <tr
-                    key={doc.id}
-                    className="hover:bg-[#F9FAFC] transition-colors group"
-                  >
-                    <td className="px-8 py-5">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center`}
-                        >
-                          <FileText
-                            className={`w-4 h-4 text-[#3B5FE5]`}
-                            strokeWidth={2.5}
-                          />
+            <CardTitle className="text-base">Contract Drafting</CardTitle>
+            <CardDescription className="text-xs">
+              Generate balanced or firm-favorable agreements using a 6-stage autonomous drafting engine and live redline studio.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <Link
+              href="/dashboard/drafting"
+              className="inline-flex items-center text-xs font-semibold text-accent hover:underline gap-1"
+            >
+              <span>Launch Drafting Studio</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </CardContent>
+        </Card>
+
+        {/* Pillar 3: Case Files */}
+        <Card className="hover:border-slate-400/80 transition-all shadow-sm flex flex-col justify-between">
+          <CardHeader>
+            <div className="w-10 h-10 rounded-md bg-purple-50 border border-purple-200/60 text-purple-700 flex items-center justify-center mb-2">
+              <FolderKanban className="w-5 h-5" />
+            </div>
+            <CardTitle className="text-base">Case Files (Litigation)</CardTitle>
+            <CardDescription className="text-xs">
+              Cross-examine multi-document case files, extract chronological event timelines, and interrogate exhibits with AI Jurist.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <Link
+              href="/dashboard/cases"
+              className="inline-flex items-center text-xs font-semibold text-accent hover:underline gap-1"
+            >
+              <span>Manage Litigation Files</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* 3. Operational Overview & Recent Documents */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Recent Analyzed Contracts */}
+        <Card className="lg:col-span-2 shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <div>
+              <CardTitle className="text-sm font-semibold">
+                Recent Contract Analyses
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Audited documents and risk status
+              </CardDescription>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push("/dashboard/analysis")}
+              className="text-xs"
+            >
+              View all
+            </Button>
+          </CardHeader>
+          <CardContent className="p-0">
+            {loading ? (
+              <div className="p-8 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Loading analysis repository...</span>
+              </div>
+            ) : contracts.length === 0 ? (
+              <div className="p-8 text-center text-xs text-muted-foreground">
+                No contracts analyzed yet. Click "Upload Contract" to begin.
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-xs">Document Name</TableHead>
+                    <TableHead className="text-xs">Type</TableHead>
+                    <TableHead className="text-xs">Counterparty</TableHead>
+                    <TableHead className="text-xs">Status</TableHead>
+                    <TableHead className="text-xs text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {contracts.map((c) => (
+                    <TableRow
+                      key={c.id}
+                      className="cursor-pointer hover:bg-muted/40"
+                      onClick={() => router.push(`/dashboard/analysis/${c.id}`)}
+                    >
+                      <TableCell className="font-medium text-xs text-foreground py-3">
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-3.5 h-3.5 text-muted-foreground" />
+                          <span className="truncate max-w-[180px]">
+                            {c.original_filename || c.markdown_file || "Untitled"}
+                          </span>
                         </div>
-                        <span
-                          onClick={() => handleViewDetails(doc.id)}
-                          className="text-[13px] font-bold text-[#0B1437] group-hover:underline cursor-pointer decoration-2 underline-offset-4"
-                        >
-                          {doc.original_filename || doc.markdown_file}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground py-3">
+                        {c.contract_type || "Commercial"}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground py-3">
+                        {c.counterparty_name || "N/A"}
+                      </TableCell>
+                      <TableCell className="py-3">
+                        {getStatusBadge(c.status)}
+                      </TableCell>
+                      <TableCell className="text-xs text-right py-3">
+                        <span className="text-accent hover:underline font-semibold">
+                          Inspect
                         </span>
-                      </div>
-                    </td>
-                    <td className="px-8 py-5 text-[12px] text-slate-500 font-medium">
-                      {new Date(doc.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="px-8 py-5">
-                      <div className="flex items-center gap-2">
-                        <div
-                          className={`w-1.5 h-1.5 rounded-full ${
-                            doc.status === "completed"
-                              ? "bg-green-500"
-                              : doc.status === "failed"
-                                ? "bg-red-500"
-                                : doc.status === "processing"
-                                  ? "bg-blue-400 animate-pulse"
-                                  : "bg-slate-300"
-                          }`}
-                        ></div>
-                        <span
-                          className={`text-[10px] font-bold tracking-wider uppercase ${
-                            doc.status === "completed"
-                              ? "text-green-600"
-                              : doc.status === "failed"
-                                ? "text-red-600"
-                                : "text-slate-500"
-                          }`}
-                        >
-                          {doc.status}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-8 py-5 text-right">
-                      <div className="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity float-right">
-                        <button
-                          onClick={() => handleViewDetails(doc.id)}
-                          className="flex items-center gap-2 text-slate-400 hover:text-[#0B1437] font-bold text-[11px] uppercase tracking-wider"
-                        >
-                          View Analysis
-                          <ExternalLink
-                            className="w-[18px] h-[18px]"
-                            strokeWidth={2.5}
-                          />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Active Litigation Cases */}
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <div>
+              <CardTitle className="text-sm font-semibold">
+                Active Case Files
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Litigation matters & timelines
+              </CardDescription>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push("/dashboard/cases")}
+              className="text-xs"
+            >
+              View all
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-3 pt-0">
+            {loading ? (
+              <div className="p-8 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Loading cases...</span>
+              </div>
+            ) : cases.length === 0 ? (
+              <div className="p-8 text-center text-xs text-muted-foreground">
+                No active case files. Create a case to index multiple exhibits.
+              </div>
+            ) : (
+              cases.map((cs) => (
+                <div
+                  key={cs.id}
+                  onClick={() => router.push(`/dashboard/cases/${cs.id}/results`)}
+                  className="p-3 rounded-md border border-border hover:bg-muted/40 cursor-pointer transition-colors"
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-semibold text-xs text-foreground truncate max-w-[180px]">
+                      {cs.title}
+                    </span>
+                    <Badge variant="outline" className="text-[10px]">
+                      {cs.documents_count || cs.documents?.length || 0} Docs
+                    </Badge>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground line-clamp-1">
+                    {cs.description || "Litigation matter under review."}
+                  </p>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

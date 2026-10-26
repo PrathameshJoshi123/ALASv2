@@ -5,6 +5,7 @@ Handles PDF contract upload, storage, and processing for legal document analysis
 """
 
 import logging
+import re
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -12,7 +13,7 @@ from typing import Annotated
 from pydantic import BaseModel, Field
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
@@ -269,14 +270,23 @@ def analyze_contract_agent(
 class DraftContractRequest(BaseModel):
     """Request schema for contract drafting."""
     drafting_instructions: str = Field(..., description="Drafting requirements, values, and guidelines")
+    contract_type: str | None = Field(default=None, description="Contract type")
+    company_name: str | None = Field(default=None, description="Company / Client name")
+    counterparty_name: str | None = Field(default=None, description="Counterparty name")
+    favor_party: str | None = Field(default="Balanced", description="Posture: Balanced, Client-Favored, Counterparty-Favored")
+    governing_law: str | None = Field(default="Indian Contract Act, 1872", description="Governing statutory jurisdiction")
+    drafting_style: str | None = Field(default="Institutional Legal", description="Drafting style: Institutional Legal, Plain English Commercial, Regulatory Strict")
 
 
 class CreateDraftRequest(BaseModel):
     """Request schema for creating a prompt-only contract draft."""
     contract_prompt: str = Field(..., description="Drafting requirements, values, and guidelines")
     contract_type: str | None = Field(default="Custom Contract", description="Type or title of the contract")
-    company_name: str | None = Field(default=None, description="Company name")
+    company_name: str | None = Field(default=None, description="Company / Client name")
     counterparty_name: str | None = Field(default=None, description="Counterparty name")
+    favor_party: str | None = Field(default="Balanced", description="Posture: Balanced, Client-Favored, Counterparty-Favored")
+    governing_law: str | None = Field(default="Indian Contract Act, 1872", description="Governing statutory jurisdiction")
+    drafting_style: str | None = Field(default="Institutional Legal", description="Drafting style: Institutional Legal, Plain English Commercial, Regulatory Strict")
 
 
 class ReiterateContractRequest(BaseModel):
@@ -332,6 +342,12 @@ def create_draft_contract_endpoint(
         task = run_agent_drafting_task.delay(
             document_id=document.id,
             drafting_instructions=request.contract_prompt,
+            contract_type=request.contract_type or "Custom Contract",
+            company_name=request.company_name,
+            counterparty_name=request.counterparty_name,
+            favor_party=request.favor_party or "Balanced",
+            governing_law=request.governing_law or "Indian Contract Act, 1872",
+            drafting_style=request.drafting_style or "Institutional Legal",
         )
         
         logger.info(f"Drafting task {task.id} queued for document {document_id}")
@@ -340,6 +356,7 @@ def create_draft_contract_endpoint(
             task_id=task.id,
             status="queued",
             message=f"Contract drafting task queued for document {document_id}",
+            document_id=document.id,
         )
     except Exception as e:
         logger.error(f"Failed to submit contract drafting task for document {document_id}: {e}")
@@ -384,6 +401,12 @@ def draft_contract_endpoint(
         task = run_agent_drafting_task.delay(
             document_id=document.id,
             drafting_instructions=request.drafting_instructions,
+            contract_type=request.contract_type or document.contract_type or "Custom Contract",
+            company_name=request.company_name or document.company_name,
+            counterparty_name=request.counterparty_name or document.counterparty_name,
+            favor_party=request.favor_party or "Balanced",
+            governing_law=request.governing_law or "Indian Contract Act, 1872",
+            drafting_style=request.drafting_style or "Institutional Legal",
         )
         
         logger.info(f"Drafting task {task.id} submitted for document {document_id}")
@@ -392,6 +415,7 @@ def draft_contract_endpoint(
             task_id=task.id,
             status="queued",
             message=f"Contract drafting task queued for document {document_id}",
+            document_id=document.id,
         )
     except Exception as e:
         logger.error(f"Failed to submit contract drafting task for document {document_id}: {e}")
@@ -436,6 +460,12 @@ def draft_contract_agent_only_endpoint(
         task = run_agent_drafting_task.delay(
             document_id=document.id,
             drafting_instructions=request.drafting_instructions,
+            contract_type=request.contract_type or document.contract_type or "Custom Contract",
+            company_name=request.company_name or document.company_name,
+            counterparty_name=request.counterparty_name or document.counterparty_name,
+            favor_party=request.favor_party or "Balanced",
+            governing_law=request.governing_law or "Indian Contract Act, 1872",
+            drafting_style=request.drafting_style or "Institutional Legal",
             auto_chunk=False,
         )
         
@@ -445,6 +475,7 @@ def draft_contract_agent_only_endpoint(
             task_id=task.id,
             status="queued",
             message=f"Agent-only contract drafting task queued for document {document_id}",
+            document_id=document.id,
         )
     except Exception as e:
         logger.error(f"Failed to submit contract drafting agent task for document {document_id}: {e}")
@@ -476,23 +507,29 @@ def get_processing_status(
     Returns:
         TaskStatusResponse with current task status and result
     """
-    # Verify document exists
-    result = db.execute(
-        select(Document).where(Document.id == document_id)
-    )
-    document = result.scalar_one_or_none()
-    
-    if not document:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Document with ID {document_id} not found",
+    # Verify document exists if valid document_id is provided
+    resolved_doc_id = None
+    if document_id and document_id not in ("undefined", "null", ""):
+        result = db.execute(
+            select(Document).where(Document.id == document_id)
         )
-    
+        document = result.scalar_one_or_none()
+        if document:
+            resolved_doc_id = document.id
+
     # Check task status
     try:
         from celery.result import AsyncResult
         
         task_result = AsyncResult(task_id, app=celery_app)
+        
+        # If document_id was not resolved from DB, check task info or result
+        if not resolved_doc_id:
+            info = task_result.info if hasattr(task_result, "info") else None
+            if isinstance(info, dict):
+                resolved_doc_id = info.get("document_id")
+            elif isinstance(task_result.result, dict):
+                resolved_doc_id = task_result.result.get("document_id")
         
         return TaskStatusResponse(
             task_id=task_id,
@@ -500,6 +537,7 @@ def get_processing_status(
             result=task_result.result if task_result.ready else None,
             state=task_result.state,
             successful=task_result.successful() if task_result.ready else False,
+            document_id=resolved_doc_id,
         )
         
     except Exception as e:
@@ -510,17 +548,66 @@ def get_processing_status(
         )
 
 
-def _get_document_live_status(doc_id: str, db_status: str | None = None) -> tuple[str, dict[str, bool]]:
-    output_json = Path("backend/storage/output") / f"{doc_id}.json"
-    report_json = Path("backend/storage/outputs") / f"{doc_id}_analysis_report.json"
-    
-    markdown_ready = output_json.exists()
-    result_ready = report_json.exists()
-    final_analysis_ready = report_json.exists()
+def _get_document_live_status(
+    doc_id: str,
+    db_status: str | None = None,
+    db: Session | None = None,
+) -> tuple[str, dict[str, bool]]:
+    # 1. Primary: Check database records directly
+    db_analysis_ready = False
+    db_extraction_ready = False
+    db_draft_ready = False
+
+    def check_records(session):
+        nonlocal db_analysis_ready, db_draft_ready, db_extraction_ready
+        from backend.models.contract_analysis import ContractAnalysis
+        from backend.models.contract_draft import ContractDraft
+        from backend.models.document_extraction import DocumentExtraction
+
+        db_analysis_ready = session.execute(
+            select(ContractAnalysis.id).where(
+                ContractAnalysis.document_id == doc_id,
+                ContractAnalysis.analysis_complete == True,
+            )
+        ).scalar_one_or_none() is not None
+
+        db_draft_ready = session.execute(
+            select(ContractDraft.id).where(ContractDraft.document_id == doc_id)
+        ).scalar_one_or_none() is not None
+
+        db_extraction_ready = session.execute(
+            select(DocumentExtraction.id).where(DocumentExtraction.document_id == doc_id)
+        ).scalar_one_or_none() is not None
+
+    try:
+        if db is not None:
+            check_records(db)
+        else:
+            from backend.database import SessionLocal
+            with SessionLocal() as session:
+                check_records(session)
+    except Exception:
+        pass
+
+    markdown_ready = db_extraction_ready
+    result_ready = db_analysis_ready or db_draft_ready or (db_status == "COMPLETED")
+    final_analysis_ready = db_analysis_ready or db_draft_ready or (db_status == "COMPLETED")
     vector_store_ready = markdown_ready
-    
+
+    # Secondary fallback for legacy documents processed before database migration
+    if not result_ready:
+        report_json = Path("backend/storage/outputs") / f"{doc_id}_analysis_report.json"
+        draft_md = Path("backend/storage/outputs") / f"{doc_id}_drafted_contract.md"
+        result_ready = report_json.exists() or draft_md.exists()
+        final_analysis_ready = report_json.exists()
+
+    if not markdown_ready:
+        output_json = Path("backend/storage/output") / f"{doc_id}.json"
+        markdown_ready = output_json.exists()
+        vector_store_ready = markdown_ready
+
     status_str = "COMPLETED" if result_ready else (db_status or "PROCESSING")
-    
+
     live_dict = {
         "markdown_ready": markdown_ready,
         "result_ready": result_ready,
@@ -554,41 +641,35 @@ def get_document(
             detail=f"Document with ID {document_id} not found",
         )
     
-    status_str, live_dict = _get_document_live_status(document.id, document.status)
+    status_str, live_dict = _get_document_live_status(document.id, document.status, db=db)
     
     from backend.services.contract_analysis_service import get_contract_analysis_from_db
-    db_analysis = get_contract_analysis_from_db(document.id) or {}
+    db_analysis = get_contract_analysis_from_db(document.id, db=db) or {}
     
-    # Check drafted contract markdown first
-    draft_md_file = Path("backend/storage/outputs") / f"{document.id}_drafted_contract.md"
-    if draft_md_file.exists():
+    # Check drafted contract in database first
+    from backend.services.contract_draft_service import get_draft_from_db
+    draft_record = get_draft_from_db(document.id, db=db)
+    if draft_record and draft_record.get("content"):
+        draft_content = draft_record.get("content", "")
+        # Strip accidental markdown code block fences
+        draft_content = re.sub(r"^[ \t]*```[a-zA-Z0-9_-]*[ \t]*$", "", draft_content, flags=re.MULTILINE)
+        draft_content = re.sub(r"\n{3,}", "\n\n", draft_content).strip()
+        db_analysis["analysis_markdown"] = draft_content
+        db_analysis["draft"] = draft_record
+        if not db_analysis.get("contract_type") and draft_record.get("contract_type"):
+            db_analysis["contract_type"] = draft_record.get("contract_type")
+        if not db_analysis.get("parties") and draft_record.get("parties"):
+            db_analysis["parties"] = draft_record.get("parties")
+
+    if not db_analysis.get("analysis_markdown"):
+        # Primary: Check parsed elements stored directly in the database
         try:
-            draft_content = draft_md_file.read_text(encoding="utf-8")
-            db_analysis["analysis_markdown"] = draft_content
-        except Exception as e:
-            logger.warning(f"Failed to read drafted contract markdown for document {document.id}: {e}")
-    else:
-        # Fallback to parsed elements json or synthesized text
-        parsed_json_file = Path("backend/storage/output") / f"{document.id}.json"
-        if parsed_json_file.exists():
-            try:
-                import json as _json
-                data = _json.loads(parsed_json_file.read_text(encoding="utf-8"))
-                elements = data.get("elements", [])
-                lines = []
-                for el in elements:
-                    txt = el.get("text", "").strip() if isinstance(el, dict) else ""
-                    if not txt:
-                        continue
-                    el_type = el.get("type", "")
-                    if el_type == "Title":
-                        lines.append(f"\n### {txt}\n")
-                    else:
-                        lines.append(txt)
-                if lines:
-                    db_analysis["analysis_markdown"] = "\n\n".join(lines)
-            except Exception as e:
-                logger.warning(f"Failed to extract markdown from elements json for {document.id}: {e}")
+            from backend.services.document_extraction_service import get_markdown_from_extraction
+            extracted_md = get_markdown_from_extraction(document.id, db=db)
+            if extracted_md:
+                db_analysis["analysis_markdown"] = extracted_md
+        except Exception as ex:
+            logger.warning(f"Could not extract markdown from DB extraction for {document.id}: {ex}")
 
     # Fallback to database chunks if still empty
     if not db_analysis.get("analysis_markdown"):
@@ -619,7 +700,7 @@ def get_document(
         id=document.id,
         name=document.name,
         original_filename=document.name,
-        markdown_file=f"{document.id}.json",
+        markdown_file=f"{document.id}.md",
         storage_link=document.storage_link,
         date_created=document.date_created.isoformat(),
         created_at=document.date_created.isoformat(),
@@ -637,6 +718,7 @@ def get_document(
         recommended_actions=db_analysis.get("recommended_actions", []),
         clauses=db_analysis.get("clauses", []),
         analysis=db_analysis,
+        draft=db_analysis.get("draft"),
         analysis_markdown=db_analysis.get("analysis_markdown", ""),
     )
 
@@ -661,14 +743,14 @@ def list_documents(
 
     res_list = []
     for doc in documents:
-        status_str, live_dict = _get_document_live_status(doc.id, doc.status)
-        db_analysis = get_contract_analysis_from_db(doc.id) or {}
+        status_str, live_dict = _get_document_live_status(doc.id, doc.status, db=db)
+        db_analysis = get_contract_analysis_from_db(doc.id, db=db) or {}
         res_list.append(
             DocumentResponse(
                 id=doc.id,
                 name=doc.name,
                 original_filename=doc.name,
-                markdown_file=f"{doc.id}.json",
+                markdown_file=f"{doc.id}.md",
                 storage_link=doc.storage_link,
                 date_created=doc.date_created.isoformat(),
                 created_at=doc.date_created.isoformat(),
@@ -935,6 +1017,117 @@ def get_contract_agent_logs(
     }
 
 
+@router.get(
+    "/{document_id}/draft/versions",
+    summary="Retrieve contract draft version history",
+    description="Fetch all historical snapshots/versions of a drafted contract from the database.",
+)
+def get_contract_draft_versions_endpoint(
+    document_id: str,
+) -> dict:
+    """
+    Retrieve historical revision snapshots of the contract draft from the database.
+    """
+    from backend.services.contract_draft_service import get_draft_versions_from_db
+    versions = get_draft_versions_from_db(document_id)
+    return {
+        "document_id": document_id,
+        "total_versions": len(versions),
+        "versions": versions,
+    }
+
+
+@router.get(
+    "/{document_id}/draft/stream",
+    summary="Real-time SSE stream of contract drafting progress",
+    description="Subscribe to live Server-Sent Events (SSE) emitting milestone updates, Indian Kanoon searches, and section completions.",
+)
+async def stream_contract_drafting(
+    document_id: str,
+):
+    """
+    Server-Sent Events endpoint streaming real-time milestones and log events for contract drafting.
+    """
+    from backend.services.drafting_stream_service import DraftingStreamService
+
+    return StreamingResponse(
+        DraftingStreamService.subscribe_stream(document_id),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@router.get(
+    "/{document_id}/draft/events",
+    summary="Get all historical contract drafting events",
+    description="Fetch the list of historical milestone events for a drafting or reiteration task (useful as a polling fallback).",
+)
+def get_contract_draft_events(
+    document_id: str,
+) -> dict:
+    """
+    Retrieve all recorded drafting milestone events for a document.
+    """
+    from backend.services.drafting_stream_service import DraftingStreamService
+    events = DraftingStreamService.get_events(document_id)
+    is_complete = any(e.get("is_complete") for e in events)
+    return {
+        "document_id": document_id,
+        "total_events": len(events),
+        "is_complete": is_complete,
+        "events": events,
+    }
+
+
+@router.get(
+    "/{document_id}/draft/logs",
+    summary="Retrieve contract drafting execution logs",
+    description="Read real-time drafting log file containing LangGraph milestone steps and tool outputs.",
+)
+def get_contract_draft_logs(
+    document_id: str,
+) -> dict:
+    """
+    Read persistent execution log file for drafting or reiteration.
+    """
+    from pathlib import Path
+    log_dir = Path("backend/storage/logs")
+    draft_log = log_dir / f"{document_id}_drafting_execution.log"
+    reiter_log = log_dir / f"{document_id}_reiteration_execution.log"
+    
+    target_log = draft_log if draft_log.exists() else reiter_log
+    all_logs = []
+    is_complete = False
+
+    if target_log.exists():
+        try:
+            with open(target_log, "r", encoding="utf-8") as f:
+                for line in f:
+                    line_str = line.strip()
+                    if not line_str or line_str.startswith("="):
+                        continue
+                    if "LANGGRAPH CONTRACT DRAFTING COMPLETE" in line_str or "COMPLETE" in line_str:
+                        is_complete = True
+                    all_logs.append({
+                        "agent_name": "ContractDraftingLangGraph",
+                        "detail": line_str,
+                    })
+        except Exception as e:
+            logger.warning(f"Error reading draft log {target_log}: {e}")
+
+    return {
+        "document_id": document_id,
+        "is_complete": is_complete,
+        "total_logs": len(all_logs),
+        "logs": all_logs,
+    }
+
+
+
 # ============================================================
 # Post-Analysis Contract Revision & Redlining Endpoints
 # ============================================================
@@ -1028,7 +1221,7 @@ class SaveContractContentRequest(BaseModel):
 @router.post(
     "/{document_id}/save-content",
     summary="Save user edited contract content",
-    description="Save edited contract markdown content to disk and update document timestamp.",
+    description="Save edited contract markdown content to database and update document timestamp.",
 )
 def save_contract_content_endpoint(
     document_id: str,
