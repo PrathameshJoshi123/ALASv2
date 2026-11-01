@@ -308,6 +308,7 @@ export default function CaseWorkspacePage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="text-xs">Document Name</TableHead>
+                    <TableHead className="text-xs">Classification</TableHead>
                     <TableHead className="text-xs">Format</TableHead>
                     <TableHead className="text-xs">Status</TableHead>
                     <TableHead className="text-xs">Added On</TableHead>
@@ -319,8 +320,13 @@ export default function CaseWorkspacePage() {
                       <TableCell className="font-semibold text-xs text-foreground py-3">
                         <div className="flex items-center gap-2">
                           <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
-                          <span className="truncate max-w-[280px]">{doc.name}</span>
+                          <span className="truncate max-w-[240px]">{doc.name}</span>
                         </div>
+                      </TableCell>
+                      <TableCell className="py-3">
+                        <Badge variant="outline" className="font-mono text-[10px] bg-slate-50">
+                          {doc.document_type || "Unclassified"}
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground py-3 uppercase">
                         {doc.file_type?.split("/")[1] || "PDF"}
@@ -365,8 +371,26 @@ export default function CaseWorkspacePage() {
               </div>
               <div className="p-3 rounded-md border border-border bg-muted/30 space-y-1">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-medium text-muted-foreground">Cross-Doc Contradictions</span>
-                  <Badge variant="outline" className="text-[10px]">RAG Ready</Badge>
+                  <span className="font-medium text-muted-foreground">Witness Contradictions</span>
+                  <Badge variant={caseDetail.has_analysis ? "destructive" : "outline"} className="text-[10px]">
+                    {caseDetail.has_analysis ? "Audited" : "RAG Ready"}
+                  </Badge>
+                </div>
+              </div>
+              <div className="p-3 rounded-md border border-border bg-muted/30 space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-medium text-muted-foreground">Statutory Penal Charges</span>
+                  <Badge variant={caseDetail.has_analysis ? "warning" : "outline"} className="text-[10px]">
+                    {caseDetail.has_analysis ? "IPC / BNS Mapped" : "Pending"}
+                  </Badge>
+                </div>
+              </div>
+              <div className="p-3 rounded-md border border-border bg-muted/30 space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-medium text-muted-foreground">Indian Kanoon Precedents</span>
+                  <Badge variant={caseDetail.has_analysis ? "success" : "outline"} className="text-[10px]">
+                    {caseDetail.has_analysis ? "Integrated" : "Pending"}
+                  </Badge>
                 </div>
               </div>
 

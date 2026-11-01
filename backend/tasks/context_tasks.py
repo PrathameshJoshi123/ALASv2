@@ -6,7 +6,12 @@ import logging
 from typing import Any
 
 from backend.celery_app import celery_app
-from celery.utils.log import get_task_logger
+try:
+    from celery.utils.log import get_task_logger
+except ImportError:
+    def get_task_logger(name):
+        import logging
+        return logging.getLogger(name)
 
 logger = get_task_logger(__name__)
 

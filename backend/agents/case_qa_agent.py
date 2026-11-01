@@ -54,29 +54,10 @@ def create_case_qa_agent() -> Any:
     """
     Create the Case QA Agent using deepagents.
     """
-    from deepagents.backends import CompositeBackend, StateBackend, StoreBackend
-    from langgraph.store.memory import InMemoryStore
-    
-    backend = CompositeBackend(
-        default=StateBackend(),
-        routes={
-            "/memories/": StoreBackend(
-                namespace=lambda rt: (
-                    "case-qa",
-                    "v1",
-                ),
-            ),
-        },
-    )
-
-    store = InMemoryStore()
-
     return create_deep_agent(
         model=get_orchestrator_model(),
         system_prompt=CASE_QA_AGENT["system_prompt"],
         subagents=[],
-        backend=backend,
-        store=store,
         skills=[],
         tools=[
             hybrid_search_case_chunks,

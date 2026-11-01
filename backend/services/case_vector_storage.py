@@ -3,7 +3,40 @@ import logging
 import math
 from typing import Any, List, Dict, Optional
 from langchain_core.documents import Document as LCDocument
-from langchain_chroma import Chroma
+try:
+    from langchain_chroma import Chroma
+except ImportError:
+    class Chroma:
+        def __init__(self, collection_name: str, embedding_function: Any = None, persist_directory: str = "./chroma_db"):
+            import chromadb
+            self.client = chromadb.PersistentClient(path=persist_directory)
+            self.collection = self.client.get_or_create_collection(name=collection_name)
+
+        def add_documents(self, documents: List[LCDocument], ids: Optional[List[str]] = None) -> List[str]:
+            docs_text = [d.page_content for d in documents]
+            metas = [d.metadata for d in documents]
+            doc_ids = ids if ids else [str(i) for i in range(len(documents))]
+            self.collection.add(documents=docs_text, metadatas=metas, ids=doc_ids)
+            return doc_ids
+
+        def similarity_search_with_relevance_scores(
+            self, query: str, k: int = 5, filter: Optional[Dict[str, Any]] = None
+        ) -> List[tuple[LCDocument, float]]:
+            res = self.collection.query(query_texts=[query], n_results=k, where=filter)
+            results = []
+            docs = res.get("documents", [[]])[0] if res.get("documents") else []
+            metas = res.get("metadatas", [[]])[0] if res.get("metadatas") else []
+            dists = res.get("distances", [[]])[0] if res.get("distances") else []
+            for doc_txt, meta, dist in zip(docs, metas, dists):
+                score = max(0.0, 1.0 - (dist if dist is not None else 0.5))
+                results.append((LCDocument(page_content=doc_txt, metadata=meta or {}), score))
+            return results
+
+        def similarity_search(
+            self, query: str, k: int = 5, filter: Optional[Dict[str, Any]] = None
+        ) -> List[LCDocument]:
+            res = self.similarity_search_with_relevance_scores(query, k=k, filter=filter)
+            return [doc for doc, _ in res]
 from sqlalchemy import select
 
 from backend.config import settings

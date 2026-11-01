@@ -8,10 +8,28 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from celery import chain
+try:
+    from celery import chain
+except ImportError:
+    def chain(*tasks):
+        class _MockChain:
+            def apply_async(self, *args, **kwargs):
+                for t in tasks:
+                    if hasattr(t, "apply_async"):
+                        t.apply_async(*args, **kwargs)
+            def delay(self, *args, **kwargs):
+                for t in tasks:
+                    if hasattr(t, "delay"):
+                        t.delay(*args, **kwargs)
+        return _MockChain()
 
 from backend.celery_app import celery_app
-from celery.utils.log import get_task_logger
+try:
+    from celery.utils.log import get_task_logger
+except ImportError:
+    def get_task_logger(name):
+        import logging
+        return logging.getLogger(name)
 
 from langchain_core.messages import HumanMessage
 from backend.services.pdf_service import PDFService

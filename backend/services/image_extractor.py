@@ -1,5 +1,11 @@
 import logging
-import pymupdf  # PyMuPDF
+try:
+    import pymupdf
+except ImportError:
+    try:
+        import fitz as pymupdf
+    except ImportError:
+        pymupdf = None
 from pathlib import Path
 from typing import Any, List, Dict
 from backend.config import settings
@@ -41,6 +47,9 @@ def extract_images_from_pdf(pdf_path: str | Path, document_id: str) -> List[Dict
     
     logger.info(f"Extracting images from PDF: {pdf_path} to {output_dir}")
     
+    if pymupdf is None:
+        logger.warning("PyMuPDF (pymupdf) not installed. Skipping PDF image extraction.")
+        return []
     try:
         doc = pymupdf.open(pdf_path)
         for page_num in range(len(doc)):

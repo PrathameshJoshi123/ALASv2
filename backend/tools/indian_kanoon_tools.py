@@ -11,7 +11,20 @@ import urllib.parse
 import urllib.request
 import logging
 from typing import Optional, List, Dict, Any
-from bs4 import BeautifulSoup
+import html
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
+
+try:
+    from ddgs import DDGS
+except ImportError:
+    try:
+        from duckduckgo_search import DDGS
+    except ImportError:
+        DDGS = None
+
 from langchain_core.tools import tool
 
 logger = logging.getLogger(__name__)
@@ -68,39 +81,59 @@ def search_via_kanoon_route(query: str, max_results: int = 5) -> List[Dict[str, 
         
         req = urllib.request.Request(url, headers=HEADERS)
         with urllib.request.urlopen(req, timeout=12) as resp:
-            html = resp.read().decode("utf-8", errors="replace")
-            soup = BeautifulSoup(html, "html.parser")
-            
+            raw_html = resp.read().decode("utf-8", errors="replace")
             seen_ids = set()
-            # Indian Kanoon wraps search results in <article class="result">
-            articles = soup.find_all("article", class_="result")
-            for article in articles:
-                rt = article.find(class_="result_title")
-                a = rt.find("a", href=True) if rt else article.find("a", href=True)
-                if not a:
-                    continue
-                href = a["href"]
-                doc_id = extract_doc_id(href)
-                if not doc_id or doc_id in seen_ids:
-                    continue
-                
-                title = a.get_text().strip()
-                if not title or title.lower() in {"entire act", "full document", "get in pdf", ""}:
-                    continue
+            
+            if BeautifulSoup is not None:
+                soup = BeautifulSoup(raw_html, "html.parser")
+                articles = soup.find_all("article", class_="result")
+                for article in articles:
+                    rt = article.find(class_="result_title")
+                    a = rt.find("a", href=True) if rt else article.find("a", href=True)
+                    if not a:
+                        continue
+                    href = a["href"]
+                    doc_id = extract_doc_id(href)
+                    if not doc_id or doc_id in seen_ids:
+                        continue
                     
-                seen_ids.add(doc_id)
-                headline = article.find("div", class_="headline")
-                snippet = headline.get_text().strip() if headline else ""
-                
-                results.append({
-                    "doc_id": doc_id,
-                    "title": title,
-                    "url": f"https://indiankanoon.org/doc/{doc_id}/",
-                    "snippet": snippet,
-                    "source": "Indian Kanoon Direct",
-                })
-                if len(results) >= max_results:
-                    break
+                    title = a.get_text().strip()
+                    if not title or title.lower() in {"entire act", "full document", "get in pdf", ""}:
+                        continue
+                        
+                    seen_ids.add(doc_id)
+                    headline = article.find("div", class_="headline")
+                    snippet = headline.get_text().strip() if headline else ""
+                    
+                    results.append({
+                        "doc_id": doc_id,
+                        "title": title,
+                        "url": f"https://indiankanoon.org/doc/{doc_id}/",
+                        "snippet": snippet,
+                        "source": "Indian Kanoon Direct",
+                    })
+                    if len(results) >= max_results:
+                        break
+            else:
+                # Built-in regex extraction when BeautifulSoup is unavailable
+                pattern = re.compile(r"""<a\s+[^>]*href=['"](/doc(?:fragment)?/(\d+)[^'"]*)['"][^>]*>(.*?)</a>""", re.DOTALL | re.IGNORECASE)
+                for m in pattern.finditer(raw_html):
+                    href, doc_id, raw_title = m.group(1), m.group(2), m.group(3)
+                    if doc_id in seen_ids:
+                        continue
+                    clean_title = html.unescape(re.sub(r'<[^>]+>', '', raw_title)).strip()
+                    if not clean_title or clean_title.lower() in {"entire act", "full document", "get in pdf", ""}:
+                        continue
+                    seen_ids.add(doc_id)
+                    results.append({
+                        "doc_id": doc_id,
+                        "title": clean_title,
+                        "url": f"https://indiankanoon.org/doc/{doc_id}/",
+                        "snippet": clean_title,
+                        "source": "Indian Kanoon Direct",
+                    })
+                    if len(results) >= max_results:
+                        break
     except Exception as e:
         logger.warning(f"Direct Kanoon route search error for query '{query}': {e}")
     return results
@@ -112,8 +145,10 @@ def search_via_ddgs(query: str, max_results: int = 4) -> List[Dict[str, Any]]:
     Tries site:indiankanoon.org query first, then natural 'indian kanoon <query>'.
     """
     results: List[Dict[str, Any]] = []
+    if DDGS is None:
+        return results
     try:
-        from ddgs import DDGS
+        if DDGS is None: return []
         clean_query = query.replace("site:indiankanoon.org", "").replace("indian kanoon", "").strip()
         # Create concise search terms to avoid Yahoo engine over-filtering
         words = [w for w in re.split(r"\s+", clean_query) if w.isalnum() or "-" in w]
@@ -168,54 +203,70 @@ def scrape_kanoon_doc(doc_id: str) -> str:
     try:
         req = urllib.request.Request(url, headers=HEADERS)
         with urllib.request.urlopen(req, timeout=12) as resp:
-            html = resp.read().decode("utf-8", errors="replace")
-            soup = BeautifulSoup(html, "html.parser")
-            
-            # Decompose ads, scripts, navbars, and promo banners
-            for tag in soup(["script", "style", "nav", "header", "footer", "aside"]):
-                tag.decompose()
-            for promo in soup.find_all(class_=lambda c: c and any(x in str(c).lower() for x in ["premium", "ad", "menu", "banner", "sidebar"])):
-                promo.decompose()
+            raw_html = resp.read().decode("utf-8", errors="replace")
+            title = f"Document ID {doc_id}"
+            cleaned_body = ""
+
+            if BeautifulSoup is not None:
+                soup = BeautifulSoup(raw_html, "html.parser")
+                for tag in soup(["script", "style", "nav", "header", "footer", "aside"]):
+                    tag.decompose()
+                for promo in soup.find_all(class_=lambda c: c and any(x in str(c).lower() for x in ["premium", "ad", "menu", "banner", "sidebar"])):
+                    promo.decompose()
+                    
+                title_node = (
+                    soup.find("h2", class_="doc_title") or 
+                    soup.find("div", class_="doc_title") or 
+                    soup.find("title")
+                )
+                if title_node:
+                    title = title_node.get_text().strip().replace(" - Indian Kanoon", "").strip()
+                    
+                content_node = (
+                    soup.find(class_="akoma-ntoso") or
+                    soup.find("article", class_="middle_column") or
+                    soup.find("div", class_="judgments") or
+                    soup.find("div", class_="doc") or
+                    soup.find("div", class_="maindoc")
+                )
+                content_text = content_node.get_text() if content_node else soup.get_text()
                 
-            # Extract document title
-            title_node = (
-                soup.find("h2", class_="doc_title") or 
-                soup.find("div", class_="doc_title") or 
-                soup.find("title")
-            )
-            title = title_node.get_text().strip() if title_node else f"Document ID {doc_id}"
-            title = title.replace(" - Indian Kanoon", "").strip()
-            
-            # Target content containers: akoma-ntoso (statutes), middle_column, judgments, doc
-            content_node = (
-                soup.find(class_="akoma-ntoso") or
-                soup.find("article", class_="middle_column") or
-                soup.find("div", class_="judgments") or
-                soup.find("div", class_="doc") or
-                soup.find("div", class_="maindoc")
-            )
-            
-            if not content_node:
-                content_text = soup.get_text()
+                lines = []
+                for line in content_text.splitlines():
+                    line = line.strip()
+                    if not line:
+                        continue
+                    if re.match(r"^\[Cites \d+, Cited by \d+\]", line):
+                        continue
+                    if line in {"[Entire Act]", "Get in PDF", "Print it!", "Take notes as you read"}:
+                        continue
+                    lines.append(line)
+                cleaned_body = "\n".join(lines)
             else:
-                content_text = content_node.get_text()
+                # Built-in regex cleaning
+                clean_html = re.sub(r'<script.*?</script>', '', raw_html, flags=re.DOTALL | re.IGNORECASE)
+                clean_html = re.sub(r'<style.*?</style>', '', clean_html, flags=re.DOTALL | re.IGNORECASE)
+                clean_html = re.sub(r'<nav.*?</nav>', '', clean_html, flags=re.DOTALL | re.IGNORECASE)
+                clean_html = re.sub(r'<header.*?</header>', '', clean_html, flags=re.DOTALL | re.IGNORECASE)
+                clean_html = re.sub(r'<footer.*?</footer>', '', clean_html, flags=re.DOTALL | re.IGNORECASE)
                 
-            # Clean up boilerplate text
-            lines = []
-            for line in content_text.splitlines():
-                line = line.strip()
-                if not line:
-                    continue
-                # Skip navigation boilerplate
-                if re.match(r"^\[Cites \d+, Cited by \d+\]", line):
-                    continue
-                if line in {"[Entire Act]", "Get in PDF", "Print it!", "Take notes as you read"}:
-                    continue
-                lines.append(line)
-                
-            cleaned_body = "\n".join(lines)
-            
-            # Format output with header and up to 3500 characters of substantive legal text
+                title_match = re.search(r'<title>(.*?)</title>', raw_html, re.IGNORECASE)
+                if title_match:
+                    title = html.unescape(title_match.group(1)).replace(" - Indian Kanoon", "").strip()
+                    
+                body_text = html.unescape(re.sub(r'<[^>]+>', ' ', clean_html))
+                lines = []
+                for line in body_text.splitlines():
+                    line = line.strip()
+                    if not line:
+                        continue
+                    if re.match(r"^\[Cites \d+, Cited by \d+\]", line):
+                        continue
+                    if line in {"[Entire Act]", "Get in PDF", "Print it!", "Take notes as you read"}:
+                        continue
+                    lines.append(line)
+                cleaned_body = "\n".join(lines)
+
             formatted_output = (
                 f"### [Indian Kanoon: {title}]\n"
                 f"URL: {url}\n\n"
@@ -233,7 +284,6 @@ def scrape_kanoon_doc(doc_id: str) -> str:
                 "summary": cleaned_body[:300].strip(),
             }
             return formatted_output
-            
     except Exception as e:
         err_msg = f"Failed to retrieve Indian Kanoon document {doc_id} from {url}: {e}"
         logger.error(err_msg)

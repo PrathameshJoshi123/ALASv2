@@ -7,7 +7,12 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import select
-from celery.utils.log import get_task_logger
+try:
+    from celery.utils.log import get_task_logger
+except ImportError:
+    def get_task_logger(name):
+        import logging
+        return logging.getLogger(name)
 
 from backend.celery_app import celery_app
 from backend.database import SessionLocal

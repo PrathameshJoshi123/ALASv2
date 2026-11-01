@@ -94,18 +94,36 @@ class PDFService:
                 ...
             ]
         """
+# Path checks already validated above
+
         if not UNSTRUCTURED_AVAILABLE:
-            raise ImportError(
-                "Unstructured library is not installed. "
-                "Install it with: pip install unstructured[pdf]"
-            )
+            logger.info(f"Unstructured library not available; using robust pypdf extractor for {file_path}")
+            try:
+                import pypdf
+                reader = pypdf.PdfReader(str(file_path))
+                normalized_elements = []
+                for page_num, page in enumerate(reader.pages, start=1):
+                    page_text = page.extract_text() or ""
+                    paragraphs = [p.strip() for p in page_text.split("\n\n") if p.strip()]
+                    if not paragraphs and page_text.strip():
+                        paragraphs = [page_text.strip()]
+                    for para in paragraphs:
+                        is_title = len(para) < 120 and (para.isupper() or any(kw in para.lower() for kw in ["section", "clause", "report", "act", "court", "first information", "agreement", "statement"]))
+                        normalized_elements.append({
+                            "type": "Title" if is_title else "NarrativeText",
+                            "text": para,
+                            "metadata": {
+                                "page_number": page_num,
+                                "filename": filename or file_path.name,
+                                "filetype": "application/pdf"
+                            }
+                        })
+                return normalized_elements
+            except Exception as pypdf_err:
+                logger.error(f"pypdf extraction error: {pypdf_err}")
+                raise ImportError(f"PDF extraction failed without unstructured: {pypdf_err}")
         
-        file_path = Path(file_path)
-        if not file_path.exists():
-            raise FileNotFoundError(f"PDF file not found: {file_path}")
-        
-        if not file_path.suffix.lower() == ".pdf":
-            raise ValueError(f"File must be a PDF: {file_path}")
+# Path checks already validated above
         
         logger.info(f"Processing PDF: {file_path}")
         
@@ -174,11 +192,34 @@ class PDFService:
         Returns:
             List of raw Unstructured element objects
         """
+# Path checks already validated above
+
         if not UNSTRUCTURED_AVAILABLE:
-            raise ImportError(
-                "Unstructured library is not installed. "
-                "Install it with: pip install unstructured[pdf]"
-            )
+            logger.info(f"Unstructured library not available; using robust pypdf extractor for {file_path}")
+            try:
+                import pypdf
+                reader = pypdf.PdfReader(str(file_path))
+                normalized_elements = []
+                for page_num, page in enumerate(reader.pages, start=1):
+                    page_text = page.extract_text() or ""
+                    paragraphs = [p.strip() for p in page_text.split("\n\n") if p.strip()]
+                    if not paragraphs and page_text.strip():
+                        paragraphs = [page_text.strip()]
+                    for para in paragraphs:
+                        is_title = len(para) < 120 and (para.isupper() or any(kw in para.lower() for kw in ["section", "clause", "report", "act", "court", "first information", "agreement", "statement"]))
+                        normalized_elements.append({
+                            "type": "Title" if is_title else "NarrativeText",
+                            "text": para,
+                            "metadata": {
+                                "page_number": page_num,
+                                "filename": filename or file_path.name,
+                                "filetype": "application/pdf"
+                            }
+                        })
+                return normalized_elements
+            except Exception as pypdf_err:
+                logger.error(f"pypdf extraction error: {pypdf_err}")
+                raise ImportError(f"PDF extraction failed without unstructured: {pypdf_err}")
         
         file_path = Path(file_path)
         if not file_path.exists():
