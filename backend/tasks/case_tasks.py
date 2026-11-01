@@ -3,21 +3,25 @@ import logging
 from pathlib import Path
 from typing import Any, Optional
 from datetime import datetime
+from sqlalchemy import select, func
 
-from celery.utils.log import get_task_logger
 from langchain_core.messages import HumanMessage
 from backend.utils.llm_utils import execute_with_exponential_backoff
 
 from backend.celery_app import celery_app
 from backend.database import SessionLocal
-from backend.models.cases import Case, CaseDocument, CaseDocumentChunk, EvidenceDetail, CaseAnalysis
+from backend.models.cases import Case, CaseDocument, CaseDocumentChunk, EvidenceDetail, CaseAnalysis, CaseTimeline
 from backend.services.pdf_service import pdf_service
 from backend.services.image_extractor import process_file_images
 from backend.services.vision_service import analyze_case_image
 from backend.services.case_vector_storage import store_case_chunks_in_vector_db
 from backend.services.chunking.pipeline import ChunkingPipeline
 
-logger = get_task_logger(__name__)
+try:
+    from celery.utils.log import get_task_logger
+    logger = get_task_logger(__name__)
+except ImportError:
+    logger = logging.getLogger(__name__)
 
 def execute_process_case_document(document_id: str) -> dict[str, Any]:
     """
@@ -130,10 +134,11 @@ def process_case_document_task(self, document_id: str) -> dict[str, Any]:
 @celery_app.task(bind=True, name="analyze_case_task")
 def analyze_case_task(self, case_id: str) -> dict[str, Any]:
     """
-    Asynchronously runs the complete case analysis pipeline:
-    1. Ensures all attached case documents are processed, chunked, and indexed in ChromaDB vector DB.
-    2. Runs the CaseOrchestrator multi-agent loop to perform complete legal analysis.
-    3. Stores the compiled CaseAnalysisResult inside CaseAnalysis in the database.
+    Asynchronously runs the complete deterministic LangGraph case analysis pipeline:
+    1. Ensures all attached case documents are processed, chunked, and indexed.
+    2. Runs the CaseOrchestrator LangGraph pipeline across specialized legal stages.
+    3. Executes autonomous precedent research on indiankanoon.org.
+    4. Stores the compiled CaseAnalysisResult inside CaseAnalysis and CaseTimeline in the database.
     """
     logger.info(f"Starting case analysis pipeline task for case: {case_id}")
     
@@ -143,15 +148,22 @@ def analyze_case_task(self, case_id: str) -> dict[str, Any]:
         ).scalar_one_or_none()
         
         if not case:
-            error_msg = f"Case {case_id} not found."
+            error_msg = f"Case {case_id} not found in database."
             logger.error(error_msg)
             return {"status": "error", "error": error_msg}
             
+        docs = case.documents or []
+        if not docs:
+            error_msg = f"Case '{case_id}' has no uploaded exhibit documents. Please upload at least one case document before triggering analysis."
+            logger.error(error_msg)
+            case.status = "error"
+            db.commit()
+            return {"status": "error", "error": error_msg}
+
         case.status = "processing"
         db.commit()
 
         # Step 1: Guarantee that all case documents are processed and chunked first
-        docs = case.documents or []
         unprocessed_docs = [d for d in docs if d.status != "completed"]
         logger.info(f"Case {case_id}: Found {len(unprocessed_docs)} document(s) needing parsing & chunking before agent analysis.")
 
@@ -159,6 +171,30 @@ def analyze_case_task(self, case_id: str) -> dict[str, Any]:
             logger.info(f"Running parsing & chunking pipeline for document {doc.id} ({doc.name})...")
             res = execute_process_case_document(doc.id)
             logger.info(f"Completed document processing for {doc.id}: status={res.get('status')}")
+
+        # Check that we have at least some chunks or evidence across documents
+        total_chunks = db.execute(
+            select(func.count(CaseDocumentChunk.id))
+            .join(CaseDocumentChunk.document)
+            .where(CaseDocument.case_id == case_id)
+        ).scalar() or 0
+
+        total_evidence = db.execute(
+            select(func.count(EvidenceDetail.id))
+            .join(EvidenceDetail.document)
+            .where(CaseDocument.case_id == case_id)
+        ).scalar() or 0
+
+        if total_chunks == 0 and total_evidence == 0:
+            error_msg = f"Case '{case_id}' exhibits could not be parsed into text chunks or visual evidence. Ensure documents are valid PDFs or readable images."
+            logger.error(error_msg)
+            case.status = "error"
+            db.commit()
+            return {"status": "error", "error": error_msg}
+
+        # Clear any prior timeline entries for this case so re-analysis doesn't duplicate
+        db.query(CaseTimeline).filter(CaseTimeline.case_id == case_id).delete()
+        db.commit()
 
         # Step 2: Establish logging directories and stream agent execution to file
         log_dir = Path("backend/storage/logs")
@@ -168,7 +204,6 @@ def analyze_case_task(self, case_id: str) -> dict[str, Any]:
         try:
             from backend.agents.case_orchestrator import create_case_orchestrator
             orchestrator = create_case_orchestrator()
-            agent_msg = f"Analyze legal case with ID: {case_id}"
 
             result_data = None
 
@@ -180,49 +215,45 @@ def analyze_case_task(self, case_id: str) -> dict[str, Any]:
                     log_file.flush()
 
                 log_write("=" * 80)
-                log_write(f">>> STARTING DEEP AGENT CASE FILE ANALYSIS FOR CASE: {case_id}")
+                log_write(f">>> STARTING DETERMINISTIC LANGGRAPH CASE FILE ANALYSIS FOR CASE: {case_id}")
                 log_write(f">>> Log file: {log_file_path}")
                 log_write("=" * 80 + "\n")
 
                 def run_stream_case_analysis():
                     nonlocal result_data
                     for chunk in orchestrator.stream(
-                        {"messages": [HumanMessage(content=agent_msg)]},
+                        {"case_id": case_id},
                         stream_mode="updates",
-                        subgraphs=True,
-                        version="v2",
                     ):
-                        if not isinstance(chunk, dict) or "type" not in chunk:
+                        if not isinstance(chunk, dict):
                             continue
 
-                        if chunk["type"] == "updates":
-                            ns = chunk.get("ns", [])
-                            data = chunk.get("data", {})
+                        # Handle both standard {node_name: node_data} and wrapped events
+                        items = chunk.get("data", {}).items() if ("type" in chunk and chunk["type"] == "updates") else chunk.items()
 
-                            if ns:
-                                path_str = " -> ".join(ns)
-                                log_write(f"\n[Subagent: {path_str}] running node...")
-                                for node_name, node_data in data.items():
-                                    log_write(f"  └─ Step: {node_name}")
-                                    if isinstance(node_data, dict) and "messages" in node_data:
-                                        for msg in node_data["messages"]:
-                                            if hasattr(msg, "tool_calls") and msg.tool_calls:
-                                                for tc in msg.tool_calls:
-                                                    log_write(f"     └─ Tool Call: {tc.get('name')}")
-                                                    log_write(f"        Arguments: {json.dumps(tc.get('args'))}")
-                                            elif msg.type == "tool":
-                                                log_write(f"     └─ Tool '{msg.name}' Response snippet: {str(msg.content)[:300]}...")
-                                            elif msg.type == "ai" and msg.content:
-                                                log_write(f"     └─ AI Response snippet: {str(msg.content)[:200]}...")
+                        for node_name, node_data in items:
+                            if str(node_name).startswith("__"):
+                                continue
+                            log_write(f"\n[Milestone: {node_name}] running...")
+                            if isinstance(node_data, dict):
+                                # Capture structured response directly from synthesize_dossier
+                                if "structured_response" in node_data and node_data["structured_response"]:
+                                    result_data = node_data["structured_response"]
+
+                                # Stream log messages generated by the node
+                                if "log_messages" in node_data and isinstance(node_data["log_messages"], list):
+                                    for msg in node_data["log_messages"]:
+                                        log_write(f"  └─ {msg}")
 
                 # Run streaming execution with backoff
                 execute_with_exponential_backoff(run_stream_case_analysis)
 
-                # Invoke direct fallback if stream didn't capture final dict
+                # Invoke fallback only if stream didn't capture final dict
                 if not result_data:
+                    log_write("Stream completed without explicit response dict; invoking graph directly...")
                     response = execute_with_exponential_backoff(
                         orchestrator.invoke,
-                        {"messages": [HumanMessage(content=agent_msg)]}
+                        {"case_id": case_id}
                     )
                     if hasattr(response, "model_dump"):
                         result_data = response.model_dump()
@@ -237,7 +268,7 @@ def analyze_case_task(self, case_id: str) -> dict[str, Any]:
                 except ValueError:
                     result_data = {"raw_report": result_data}
 
-            # Optional cache report to storage output file
+            # Cache report to storage output file
             try:
                 output_dir = Path("backend/storage/output")
                 output_dir.mkdir(parents=True, exist_ok=True)
@@ -262,9 +293,12 @@ def analyze_case_task(self, case_id: str) -> dict[str, Any]:
                 )
                 db.add(analysis)
 
-            # Extract timeline items from result_data if present
-            if isinstance(result_data, dict) and "timeline" in result_data and isinstance(result_data["timeline"], list):
-                from backend.models.cases import CaseTimeline
+            # Persist timeline items into CaseTimeline DB table if not already persisted
+            existing_timelines_count = db.execute(
+                select(func.count(CaseTimeline.id)).where(CaseTimeline.case_id == case_id)
+            ).scalar() or 0
+
+            if existing_timelines_count == 0 and isinstance(result_data, dict) and "timeline" in result_data and isinstance(result_data["timeline"], list):
                 for item in result_data["timeline"]:
                     if isinstance(item, dict) and item.get("event_description"):
                         try:
@@ -272,13 +306,36 @@ def analyze_case_task(self, case_id: str) -> dict[str, Any]:
                             try:
                                 event_dt = datetime.fromisoformat(date_str)
                             except ValueError:
-                                event_dt = datetime.now()
+                                try:
+                                    event_dt = datetime.strptime(date_str, "%Y-%m-%d")
+                                except ValueError:
+                                    event_dt = datetime.now()
+
+                            raw_doc_id = item.get("source_document_id")
+                            safe_doc_id = None
+                            if raw_doc_id:
+                                val_str = str(raw_doc_id).strip()
+                                doc_match = db.execute(
+                                    select(CaseDocument.id)
+                                    .where(CaseDocument.case_id == case_id)
+                                    .where(CaseDocument.id == val_str)
+                                ).scalar_one_or_none()
+                                if doc_match:
+                                    safe_doc_id = doc_match
+                                else:
+                                    named_match = db.execute(
+                                        select(CaseDocument.id)
+                                        .where(CaseDocument.case_id == case_id)
+                                        .where(CaseDocument.name.ilike(f"%{val_str}%"))
+                                    ).scalars().first()
+                                    if named_match:
+                                        safe_doc_id = named_match
 
                             timeline_entry = CaseTimeline(
                                 case_id=case_id,
                                 event_date=event_dt,
                                 event_description=item["event_description"],
-                                source_document_id=item.get("source_document_id"),
+                                source_document_id=safe_doc_id,
                                 source_page=item.get("source_page"),
                                 citation_quote=item.get("citation_quote")
                             )
@@ -312,4 +369,4 @@ def select_case_by_id(case_id: str):
 
 def select_analysis_by_case_and_type(case_id: str, type_str: str):
     from sqlalchemy import select
-    return select(CaseAnalysis).where(Case.id == case_id).where(CaseAnalysis.analysis_type == type_str)
+    return select(CaseAnalysis).where(CaseAnalysis.case_id == case_id).where(CaseAnalysis.analysis_type == type_str)

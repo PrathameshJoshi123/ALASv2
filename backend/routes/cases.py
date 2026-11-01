@@ -470,34 +470,55 @@ def query_case_qa(
     try:
         from backend.agents.case_qa_agent import create_case_qa_agent
         from langchain_core.messages import HumanMessage
+        from backend.utils.llm_utils import execute_with_exponential_backoff
         
         qa_agent = create_case_qa_agent()
         
         # Inject case_id context to instruct QA agent where to query
         user_msg = f"In case_id: {case_id}, answer this question: {request.question}"
         
-        # Invoke agent
-        response = qa_agent.invoke({"messages": [HumanMessage(content=user_msg)]})
+        # Invoke agent with resilient backoff for rate limits
+        response = execute_with_exponential_backoff(
+            qa_agent.invoke,
+            {"messages": [HumanMessage(content=user_msg)]}
+        )
         
         # Parse output
         ans_data = None
         if hasattr(response, "model_dump"):
             ans_data = response.model_dump()
         elif isinstance(response, dict):
-            ans_data = response
+            if "structured_response" in response and response["structured_response"]:
+                sr = response["structured_response"]
+                ans_data = sr.model_dump() if hasattr(sr, "model_dump") else sr
+            elif "messages" in response and response["messages"]:
+                last_msg = response["messages"][-1]
+                content = getattr(last_msg, "content", "")
+                if hasattr(last_msg, "tool_calls") and last_msg.tool_calls:
+                    for tc in last_msg.tool_calls:
+                        if isinstance(tc.get("args"), dict):
+                            ans_data = tc["args"]
+                            break
+                if not ans_data:
+                    ans_data = {"answer": content, "citations": []}
+            else:
+                ans_data = response
         else:
             ans_data = getattr(response, "content", str(response))
-            
+
         if isinstance(ans_data, str):
             import json
             try:
                 ans_data = json.loads(ans_data)
             except ValueError:
                 ans_data = {"answer": ans_data, "citations": []}
-                
+
+        final_answer = ans_data.get("answer", "") if isinstance(ans_data, dict) else str(ans_data)
+        final_citations = ans_data.get("citations", []) if isinstance(ans_data, dict) else []
+
         return QAResponse(
-            answer=ans_data.get("answer", ""),
-            citations=ans_data.get("citations", [])
+            answer=final_answer,
+            citations=final_citations
         )
         
     except Exception as e:
