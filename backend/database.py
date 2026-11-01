@@ -41,8 +41,17 @@ engine_kwargs = {
     "pool_pre_ping": True,
 }
 if not database_url.startswith("sqlite"):
-    engine_kwargs["pool_size"] = 5
-    engine_kwargs["max_overflow"] = 10
+    engine_kwargs["pool_size"] = 15
+    engine_kwargs["max_overflow"] = 15
+    engine_kwargs["pool_recycle"] = 300
+    engine_kwargs["pool_timeout"] = 30
+    engine_kwargs["connect_args"] = {
+        "connect_timeout": 10,
+        "keepalives": 1,
+        "keepalives_idle": 30,
+        "keepalives_interval": 10,
+        "keepalives_count": 5,
+    }
 
 engine = create_engine(database_url, **engine_kwargs)
 
@@ -101,22 +110,33 @@ def get_db_context() -> Generator[Session, None, None]:
         session.close()
 
 
-def init_db() -> None:
+def run_migrations_safely() -> None:
     """
-    Initialize database tables and run column migrations for missing fields.
+    Run column migrations for missing fields. Can be executed asynchronously or on demand.
     """
-    Base.metadata.create_all(bind=engine)
+    logger = logging.getLogger(__name__)
     try:
         from backend.database_migrations.create_contract_analysis_tables import create_tables_if_not_exist
         create_tables_if_not_exist()
     except Exception as e:
-        print(f"Warning: automatic schema migration check failed: {e}")
+        logger.warning(f"Schema migration check failed: {e}")
     try:
         from backend.database_migrations.create_phase1_migration_tables import create_phase1_tables_if_not_exist
         create_phase1_tables_if_not_exist()
     except Exception as e:
-        print(f"Warning: phase 1 schema migration check failed: {e}")
-    print("Database tables created and initialized successfully.")
+        logger.warning(f"Phase 1 schema migration check failed: {e}")
+
+
+def init_db(run_heavy_migrations: bool = False) -> None:
+    """
+    Initialize database tables quickly.
+    Runs Base.metadata.create_all() which creates missing tables in ~0.1s.
+    Heavy column introspection migrations can be run in the background or when explicitly enabled.
+    """
+    Base.metadata.create_all(bind=engine)
+    if run_heavy_migrations or getattr(settings, "AUTO_RUN_MIGRATIONS", False):
+        run_migrations_safely()
+    logging.getLogger(__name__).info("Database tables initialized successfully.")
 
 
 def drop_db() -> None:

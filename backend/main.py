@@ -23,7 +23,7 @@ from fastapi.staticfiles import StaticFiles
 from backend import __version__
 from backend.celery_app import celery_app
 from backend.config import settings
-from backend.database import Base, init_db, close_db
+from backend.database import Base, init_db, close_db, run_migrations_safely
 
 # Configure logging
 logging.basicConfig(
@@ -53,6 +53,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     try:
         await asyncio.to_thread(init_db)
         logger.info("Database initialized")
+        # Run schema column checks in background without blocking server startup
+        asyncio.create_task(asyncio.to_thread(run_migrations_safely))
     except Exception as e:
         logger.error(f"Database initialization failed: {e}")
         raise

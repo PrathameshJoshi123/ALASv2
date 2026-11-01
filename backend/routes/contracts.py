@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy import select, func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from backend.celery_app import celery_app
 from backend.config import settings
@@ -552,42 +552,48 @@ def _get_document_live_status(
     doc_id: str,
     db_status: str | None = None,
     db: Session | None = None,
+    doc: Document | None = None,
 ) -> tuple[str, dict[str, bool]]:
     # 1. Primary: Check database records directly
     db_analysis_ready = False
     db_extraction_ready = False
     db_draft_ready = False
 
-    def check_records(session):
-        nonlocal db_analysis_ready, db_draft_ready, db_extraction_ready
-        from backend.models.contract_analysis import ContractAnalysis
-        from backend.models.contract_draft import ContractDraft
-        from backend.models.document_extraction import DocumentExtraction
+    if doc is not None:
+        db_analysis_ready = (doc.analysis is not None and getattr(doc.analysis, "analysis_complete", False))
+        db_draft_ready = (doc.draft is not None)
+        db_extraction_ready = (doc.extraction is not None)
+    else:
+        def check_records(session):
+            nonlocal db_analysis_ready, db_draft_ready, db_extraction_ready
+            from backend.models.contract_analysis import ContractAnalysis
+            from backend.models.contract_draft import ContractDraft
+            from backend.models.document_extraction import DocumentExtraction
 
-        db_analysis_ready = session.execute(
-            select(ContractAnalysis.id).where(
-                ContractAnalysis.document_id == doc_id,
-                ContractAnalysis.analysis_complete == True,
-            )
-        ).scalar_one_or_none() is not None
+            db_analysis_ready = session.execute(
+                select(ContractAnalysis.id).where(
+                    ContractAnalysis.document_id == doc_id,
+                    ContractAnalysis.analysis_complete == True,
+                )
+            ).scalar_one_or_none() is not None
 
-        db_draft_ready = session.execute(
-            select(ContractDraft.id).where(ContractDraft.document_id == doc_id)
-        ).scalar_one_or_none() is not None
+            db_draft_ready = session.execute(
+                select(ContractDraft.id).where(ContractDraft.document_id == doc_id)
+            ).scalar_one_or_none() is not None
 
-        db_extraction_ready = session.execute(
-            select(DocumentExtraction.id).where(DocumentExtraction.document_id == doc_id)
-        ).scalar_one_or_none() is not None
+            db_extraction_ready = session.execute(
+                select(DocumentExtraction.id).where(DocumentExtraction.document_id == doc_id)
+            ).scalar_one_or_none() is not None
 
-    try:
-        if db is not None:
-            check_records(db)
-        else:
-            from backend.database import SessionLocal
-            with SessionLocal() as session:
-                check_records(session)
-    except Exception:
-        pass
+        try:
+            if db is not None:
+                check_records(db)
+            else:
+                from backend.database import SessionLocal
+                with SessionLocal() as session:
+                    check_records(session)
+        except Exception:
+            pass
 
     markdown_ready = db_extraction_ready
     result_ready = db_analysis_ready or db_draft_ready or (db_status == "COMPLETED")
@@ -631,9 +637,15 @@ def get_document(
     Get information about a stored document.
     """
     result = db.execute(
-        select(Document).where(Document.id == document_id)
+        select(Document)
+        .options(
+            joinedload(Document.analysis),
+            joinedload(Document.draft),
+            joinedload(Document.extraction),
+        )
+        .where(Document.id == document_id)
     )
-    document = result.scalar_one_or_none()
+    document = result.unique().scalar_one_or_none()
     
     if not document:
         raise HTTPException(
@@ -641,14 +653,16 @@ def get_document(
             detail=f"Document with ID {document_id} not found",
         )
     
-    status_str, live_dict = _get_document_live_status(document.id, document.status, db=db)
+    status_str, live_dict = _get_document_live_status(document.id, document.status, db=db, doc=document)
     
     from backend.services.contract_analysis_service import get_contract_analysis_from_db
     db_analysis = get_contract_analysis_from_db(document.id, db=db) or {}
     
     # Check drafted contract in database first
-    from backend.services.contract_draft_service import get_draft_from_db
-    draft_record = get_draft_from_db(document.id, db=db)
+    draft_record = document.draft.to_dict() if document.draft else None
+    if not draft_record:
+        from backend.services.contract_draft_service import get_draft_from_db
+        draft_record = get_draft_from_db(document.id, db=db)
     if draft_record and draft_record.get("content"):
         draft_content = draft_record.get("content", "")
         # Strip accidental markdown code block fences
@@ -664,10 +678,13 @@ def get_document(
     if not db_analysis.get("analysis_markdown"):
         # Primary: Check parsed elements stored directly in the database
         try:
-            from backend.services.document_extraction_service import get_markdown_from_extraction
-            extracted_md = get_markdown_from_extraction(document.id, db=db)
-            if extracted_md:
-                db_analysis["analysis_markdown"] = extracted_md
+            if document.extraction and document.extraction.extracted_text:
+                db_analysis["analysis_markdown"] = document.extraction.extracted_text
+            else:
+                from backend.services.document_extraction_service import get_markdown_from_extraction
+                extracted_md = get_markdown_from_extraction(document.id, db=db)
+                if extracted_md:
+                    db_analysis["analysis_markdown"] = extracted_md
         except Exception as ex:
             logger.warning(f"Could not extract markdown from DB extraction for {document.id}: {ex}")
 
@@ -734,17 +751,38 @@ def list_documents(
     db: Session = Depends(get_db),
 ):
     """
-    List all uploaded documents with metadata and analysis.
+    List all uploaded documents with metadata and analysis using efficient database pagination and joined relationships.
     """
-    result = db.execute(select(Document).order_by(Document.date_created.desc()))
-    documents = result.scalars().all()
+    total = db.scalar(select(func.count(Document.id))) or 0
+    start = max(0, (page - 1) * page_size)
     
-    from backend.services.contract_analysis_service import get_contract_analysis_from_db
+    stmt = (
+        select(Document)
+        .options(
+            joinedload(Document.analysis),
+            joinedload(Document.draft),
+            joinedload(Document.extraction),
+        )
+        .order_by(Document.date_created.desc())
+        .offset(start)
+        .limit(page_size)
+    )
+    documents = db.execute(stmt).unique().scalars().all()
 
     res_list = []
     for doc in documents:
-        status_str, live_dict = _get_document_live_status(doc.id, doc.status, db=db)
-        db_analysis = get_contract_analysis_from_db(doc.id, db=db) or {}
+        status_str, live_dict = _get_document_live_status(doc.id, doc.status, db=db, doc=doc)
+        an = doc.analysis
+        contract_type = (an.contract_type if an else None) or doc.contract_type or "Service Agreement"
+        overall_risk_score = float(an.overall_risk_score or 0.0) if an else 0.0
+        critical_issues = int(an.critical_issues or 0) if an else 0
+        high_issues = int(an.high_issues or 0) if an else 0
+        medium_issues = int(an.medium_issues or 0) if an else 0
+        low_issues = int(an.low_issues or 0) if an else 0
+        analysis_summary = (an.summary or "") if an else ""
+        recommended_actions = (an.recommended_actions or []) if an else []
+        clauses = (an.clauses or []) if an else []
+
         res_list.append(
             DocumentResponse(
                 id=doc.id,
@@ -756,27 +794,22 @@ def list_documents(
                 created_at=doc.date_created.isoformat(),
                 counterparty_name=doc.counterparty_name or "N/A",
                 company_name=doc.company_name or "Your Organization",
-                contract_type=db_analysis.get("contract_type") or doc.contract_type or "Service Agreement",
+                contract_type=contract_type,
                 status=status_str,
                 live=live_dict,
-                overall_risk_score=float(db_analysis.get("overall_risk_score", 0.0) or 0.0),
-                critical_issues=int(db_analysis.get("critical_issues", 0) or 0),
-                high_issues=int(db_analysis.get("high_issues", 0) or 0),
-                medium_issues=int(db_analysis.get("medium_issues", 0) or 0),
-                low_issues=int(db_analysis.get("low_issues", 0) or 0),
-                analysis_summary=db_analysis.get("analysis_summary") or db_analysis.get("summary") or "",
-                recommended_actions=db_analysis.get("recommended_actions", []),
-                clauses=db_analysis.get("clauses", []),
+                overall_risk_score=overall_risk_score,
+                critical_issues=critical_issues,
+                high_issues=high_issues,
+                medium_issues=medium_issues,
+                low_issues=low_issues,
+                analysis_summary=analysis_summary,
+                recommended_actions=recommended_actions,
+                clauses=clauses,
             )
         )
     
-    total = len(res_list)
-    start = (page - 1) * page_size
-    end = start + page_size
-    paginated_items = res_list[start:end]
-    
     return {
-        "items": paginated_items,
+        "items": res_list,
         "total": total,
         "page": page,
         "page_size": page_size,

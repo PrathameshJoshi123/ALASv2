@@ -5,7 +5,7 @@ Loads from .env file and environment variables.
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -24,6 +24,20 @@ class Settings(BaseSettings):
     APP_NAME: str = "MajorProject Backend"
     APP_VERSION: str = "0.1.0"
     DEBUG: bool = True
+    
+    @field_validator("DEBUG", mode="before")
+    @classmethod
+    def parse_debug_value(cls, v: Any) -> bool:
+        """Gracefully handle strings like 'release', 'production', 'false', '0', etc."""
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, str):
+            val = v.strip().lower()
+            if val in ("true", "1", "yes", "y", "debug", "dev", "development"):
+                return True
+            if val in ("false", "0", "no", "n", "release", "prod", "production"):
+                return False
+        return bool(v)
     
     # Server
     HOST: str = "0.0.0.0"
@@ -60,6 +74,7 @@ class Settings(BaseSettings):
     # Feature Flags
     CONTRACT_ANALYSIS_ENABLED: bool = True
     WEB_RESEARCH_ENABLED: bool = True
+    AUTO_RUN_MIGRATIONS: bool = False
     
     # Neo4j (optional)
     NEO4J_URI: Optional[str] = None

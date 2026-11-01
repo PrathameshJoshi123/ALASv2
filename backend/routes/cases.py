@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from backend.config import settings
 from backend.database import get_db
@@ -108,7 +108,12 @@ def list_cases(
     """
     try:
         cases = db.execute(
-            select(Case).order_by(Case.created_at.desc())
+            select(Case)
+            .options(
+                selectinload(Case.documents),
+                selectinload(Case.analyses),
+            )
+            .order_by(Case.created_at.desc())
         ).scalars().all()
         
         response = []
@@ -146,7 +151,13 @@ def get_case(
     Get detailed information for a single case including attached documents.
     """
     case = db.execute(
-        select(Case).where(Case.id == case_id)
+        select(Case)
+        .options(
+            selectinload(Case.documents),
+            selectinload(Case.analyses),
+            selectinload(Case.timelines),
+        )
+        .where(Case.id == case_id)
     ).scalar_one_or_none()
     
     if not case:
@@ -234,7 +245,13 @@ def upload_case_document(
     """
     # Verify case exists
     case = db.execute(
-        select(Case).where(Case.id == case_id)
+        select(Case)
+        .options(
+            selectinload(Case.documents),
+            selectinload(Case.analyses),
+            selectinload(Case.timelines),
+        )
+        .where(Case.id == case_id)
     ).scalar_one_or_none()
     
     if not case:
@@ -328,7 +345,13 @@ def analyze_case(
     Queue background task to run CaseOrchestrator to perform complete multi-agent legal analysis.
     """
     case = db.execute(
-        select(Case).where(Case.id == case_id)
+        select(Case)
+        .options(
+            selectinload(Case.documents),
+            selectinload(Case.analyses),
+            selectinload(Case.timelines),
+        )
+        .where(Case.id == case_id)
     ).scalar_one_or_none()
     
     if not case:
@@ -429,7 +452,13 @@ def query_case_qa(
     """
     # Verify case exists
     case = db.execute(
-        select(Case).where(Case.id == case_id)
+        select(Case)
+        .options(
+            selectinload(Case.documents),
+            selectinload(Case.analyses),
+            selectinload(Case.timelines),
+        )
+        .where(Case.id == case_id)
     ).scalar_one_or_none()
     
     if not case:
