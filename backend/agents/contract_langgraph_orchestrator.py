@@ -138,6 +138,35 @@ def get_total_chunks_count(document_id: str) -> int:
         return result.scalar() or 0
 
 
+def normalize_parties_list(parties: Any) -> list[str]:
+    """Normalize contracting parties into a list of clean strings, safely handling dicts, lists, or strings."""
+    if not parties:
+        return []
+    if isinstance(parties, str):
+        return [parties.strip()]
+    if not isinstance(parties, (list, tuple)):
+        return [str(parties)]
+    
+    normalized = []
+    for p in parties:
+        if isinstance(p, dict):
+            name = p.get("name") or p.get("entity") or p.get("party") or ""
+            role = p.get("role") or p.get("designation") or ""
+            if name and role:
+                normalized.append(f"{name} ({role})")
+            elif name:
+                normalized.append(str(name))
+            elif role:
+                normalized.append(str(role))
+            else:
+                normalized.append(json.dumps(p))
+        elif isinstance(p, (list, tuple)):
+            normalized.append(", ".join([str(item) for item in p]))
+        elif p is not None:
+            normalized.append(str(p).strip())
+    return [item for item in normalized if item]
+
+
 # Maximum turns for autonomous legal research loop
 MAX_LEGAL_RESEARCH_TURNS = 3
 BATCH_CHUNK_LIMIT = 15
@@ -205,46 +234,52 @@ def node_document_intake(state: ContractAnalysisGraphState) -> Dict[str, Any]:
     
     llm = get_resilient_llm(model_name=SPECIALIST_MODEL_NAME, temperature=0.0)
     
-    prompt = f"""You are the Document Intake Specialist for contract analysis.
-Analyze the following introductory portion of the contract and extract:
-1. Specific Contract Type (e.g., Real Estate Sale Agreement, Master Services Agreement, Commercial Lease, Employment Agreement, NDA).
-2. The contracting parties (names, roles, entities).
-3. Brief summary of the preamble, recitals, and effective date.
+    prompt = f"""You are a Senior Legal Intake Specialist and Contract Review Advocate.
+Examine the introductory portion, recitals, and initial clauses of the agreement below with legal precision.
+Determine:
+1. Exact Contract Classification (e.g., 'Commercial Lease Agreement', 'Agreement of Lease', 'Master Services Agreement', 'Non-Disclosure Agreement', 'Employment Agreement', 'EPC Contract', 'Share Purchase Agreement').
+2. Contracting Parties: List each entity name, formal corporate/statutory designation (e.g. 'National Highways Authority of India', 'Proprietor', 'Private Limited Company'), and designated role ('Lessor', 'Lessee', 'Disclosing Party', 'Employer', etc.).
+3. Preamble & Recitals Synthesis: Concise legal analysis of the underlying consideration, demised premises/scope, execution date, and legal intent.
 
-Contract Beginning Text:
-{intro_text[:4000]}
+Contract Intake Excerpt:
+{intro_text[:5000]}
 
-Respond ONLY in valid JSON with keys:
-"contract_type": string,
-"parties": list of strings,
-"preamble_summary": string
+Respond STRICTLY in valid JSON matching this schema:
+{{
+  "contract_type": "Specific Legal Classification",
+  "parties": ["Party 1 (Role)", "Party 2 (Role)"],
+  "preamble_summary": "Detailed legal summary of recitals and consideration"
+}}
 """
 
     response = llm.invoke([HumanMessage(content=prompt)])
-    content = response.content
+    content = response.content.strip()
     
-    contract_type = "General Commercial Contract"
-    parties = []
-    preamble_summary = ""
-    
-    try:
-        # Clean json backticks if present
-        cleaned = content.strip()
-        if "```json" in cleaned:
-            cleaned = cleaned.split("```json")[1].split("```")[0].strip()
-        elif "```" in cleaned:
-            cleaned = cleaned.split("```")[1].split("```")[0].strip()
-        data = json.loads(cleaned)
-        contract_type = data.get("contract_type", contract_type)
-        parties = data.get("parties", parties)
-        preamble_summary = data.get("preamble_summary", preamble_summary)
-    except Exception as e:
-        logger.warning(f"[node_document_intake] JSON parsing error: {e}. Raw content: {content[:200]}")
-        # Basic heuristic fallback
-        if "agreement" in intro_text.lower():
-            contract_type = "Commercial Agreement"
+    if "```json" in content:
+        cleaned = content.split("```json")[1].split("```")[0].strip()
+    elif "```" in content:
+        cleaned = content.split("```")[1].split("```")[0].strip()
+    else:
+        cleaned = content
 
-    logger.info(f"[LangGraph: node_document_intake] Detected Contract Type: {contract_type}, Parties: {parties}")
+    json_match = re.search(r"(\{.*\})", cleaned, re.DOTALL)
+    if json_match:
+        cleaned = json_match.group(1).strip()
+
+    try:
+        data = json.loads(cleaned)
+    except Exception as e:
+        logger.error(f"[node_document_intake] Failed to parse document intake JSON: {e}\nRaw content:\n{content}")
+        raise ValueError(f"Document intake classification failed to produce valid JSON: {e}")
+
+    contract_type = data.get("contract_type")
+    if not contract_type:
+        raise ValueError("Document intake failed: 'contract_type' was not extracted by the legal intake specialist.")
+
+    parties = normalize_parties_list(data.get("parties"))
+    preamble_summary = data.get("preamble_summary") or ""
+
+    logger.info(f"[LangGraph: node_document_intake] Successfully Classified: {contract_type}, Parties: {parties}")
     
     return {
         "total_chunks": total,
@@ -489,10 +524,11 @@ CRITICAL INDIAN LAW CHECKS:
 Synthesize your legal conclusions with explicit statutory citations, ratio decidendi, and exact Indian Kanoon URLs.""")
 
     topics_summary = "\n".join([f"- {t}" for t in flagged[:6]]) if flagged else "- Check Indian Contract Act 1872 general enforceability and Section 73/74 damages."
+    parties_str = ', '.join(normalize_parties_list(state.get('parties', []))) or "Parties unspecified"
     initial_user_msg = HumanMessage(content=f"""Here are the legal issues and suspect clauses identified in the contract:
 {topics_summary}
 
-Parties: {', '.join(state.get('parties', []))}
+Parties: {parties_str}
 Contract Type: {state.get('contract_type', 'Commercial Contract')}
 
 Please investigate these provisions on Indian Kanoon using your tools. Search for the relevant statutory sections or landmark judgments, inspect the document text, and verify if any contractual terms are void, unenforceable, or legally risky under Indian Law.""")
@@ -673,55 +709,94 @@ def node_risk_synthesis(state: ContractAnalysisGraphState) -> Dict[str, Any]:
             legal_advisor_text = str(msg.content)
             break
             
+    # Build structured substantive summaries of extracted clauses and preliminary risks
+    clauses_digest = []
+    for idx, c in enumerate(clauses[:35]):
+        clauses_digest.append(
+            f"Clause {idx + 1}: [{c.section_title}] (Type: {c.clause_type}, Severity: {c.severity})\n"
+            f"  Text Excerpt: \"{c.raw_text[:220]}\"\n"
+            f"  Identified Risk: {c.risk_description}\n"
+            f"  Legal Reasoning: {c.legal_reasoning}"
+        )
+    clauses_text = "\n\n".join(clauses_digest) if clauses_digest else "No individual clauses extracted."
+
+    risks_digest = []
+    for r in risks[:25]:
+        risks_digest.append(
+            f"- [{r.severity} | {r.category}] {r.description}\n"
+            f"  Affected Party: {r.affected_party or 'Unspecified'} | Mitigation: {r.mitigation or 'Legal Review Required'}"
+        )
+    risks_text = "\n".join(risks_digest) if risks_digest else "No preliminary risks categorized."
+
     llm = get_resilient_llm(model_name=ORCHESTRATOR_MODEL_NAME, temperature=0.0)
     
-    prompt = f"""You are the Chief Legal Risk Assessor.
-Synthesize the complete contract analysis by integrating extracted clauses with our Indian Kanoon legal research.
+    prompt = f"""You are the Chief Legal Risk Assessor and Senior Advocate.
+Conduct a rigorous, lawyer-grade synthesis of this agreement under Indian Law (Indian Contract Act 1872, Specific Relief Act 1963, Arbitration & Conciliation Act 1996, and Indian Kanoon judicial precedents).
 
-Contract Type: {state.get('contract_type')}
-Parties: {', '.join(state.get('parties', []))}
+CONTRACT METADATA:
+- Classification: {state.get('contract_type')}
+- Contracting Parties: {', '.join(normalize_parties_list(state.get('parties', []))) or 'Parties defined in agreement'}
+- Preamble/Recitals: {state.get('preamble_summary', 'Not specified')}
 
-Number of Clauses: {len(clauses)}
-Number of Obligations: {len(obligations)}
-Preliminary Risks: {len(risks)}
+EXTRACTED SUBSTANTIVE CLAUSES ({len(clauses)} Total):
+{clauses_text}
 
-Legal Research Findings from Indian Kanoon:
-{legal_advisor_text[:3000]}
+PRELIMINARY RISK FINDINGS ({len(risks)} Total):
+{risks_text}
 
-Research Notes:
-{chr(10).join(notes[:5])}
+INDIAN KANOON PRECEDENTS & STATUTORY RESEARCH:
+{legal_advisor_text[:3500] if legal_advisor_text else 'Direct statutory review under Indian Contract Act 1872'}
 
-CRITICAL TASKS:
-1. Identify any clauses that violate Indian Law:
-   - Restraint of trade / Non-compete (Void under Section 27, Indian Contract Act 1872).
-   - Unenforceable penalties disguised as liquidated damages (Section 74, Indian Contract Act 1872; Kailash Nath Associates v. DDA).
-   - Absolute restraint on legal proceedings or improper jurisdiction ouster (Section 28, Indian Contract Act 1872).
-   - Unilateral appointment of sole arbitrator (Invalidated under Arbitration & Conciliation Act 1996; Perkins Eastman).
-2. Calculate overall risk score (0.0 to 100.0) based on severity of risks and presence of statutory non-compliance.
-3. Count the number of critical, high, medium, and low issues.
-4. Formulate 4-6 high-impact key findings grounded with Indian Kanoon citations where applicable.
-5. Formulate 4-6 concrete recommended actions for legal counsel.
-6. Formulate 3-5 unresolved questions / ambiguities to clarify with counterparties.
-7. Write an executive summary.
+RESEARCH NOTES & RATIO DECIDENDI:
+{chr(10).join(notes[:6]) if notes else 'Standard Indian statutory review'}
 
-Respond ONLY in valid JSON matching this schema:
+YOUR MANDATE:
+1. Conduct deep statutory scrutiny under Indian Law:
+   - Section 27, Indian Contract Act 1872: Restraint of trade / post-termination covenants (VOID ab initio).
+   - Section 74, Indian Contract Act 1872: Liquidated damages vs unenforceable penalty stipulations (Kailash Nath Associates v. DDA; reasonable compensation ceiling).
+   - Section 28, Indian Contract Act 1872: Restraint on legal proceedings, truncated limitation periods, or improper jurisdiction ouster.
+   - Section 12(5), Arbitration & Conciliation Act 1996: Unilateral appointment of sole arbitrator (Perkins Eastman, TRF Ltd).
+   - Indefinite/Unlimited Indemnities and unilateral termination without notice.
+2. Calculate a realistic, calibrated OVERALL RISK SCORE (0.0 to 100.0 as a float):
+   - 0.0 to 25.0 (LOW RISK): Well-balanced commercial contract, standard mutual obligations, standard boilerplate.
+   - 25.1 to 50.0 (MODERATE RISK): Standard commercial agreement with normal negotiation points, minor blanks/placeholders, missing notice grace periods.
+   - 50.1 to 75.0 (HIGH RISK): Disproportionate covenants, uncapped liability, one-sided termination for convenience.
+   - 75.1 to 95.0 (CRITICAL RISK): Explicit statutory violations (e.g. void non-compete, void penalty forfeiture, unilateral arbitrator).
+   - 95.1 to 100.0 (UNLAWFUL / VOID AB INITIO): Completely void contract under Section 23 ICA.
+   Do NOT arbitrarily assign 100% to standard agreements. A typical lease or commercial agreement with standard blanks or missing terms should score between 28.0 and 48.0.
+3. Count issues by severity based on the clauses and risks above.
+4. Formulate 4-6 specific, high-impact key legal findings referencing actual clauses from the agreement.
+5. Formulate 4-6 concrete, actionable redlining and negotiation recommendations for legal counsel.
+6. Formulate 3-5 critical unresolved questions/ambiguities to clarify with counterparty before execution.
+7. Write an authoritative, multi-paragraph Legal Executive Summary analyzing enforceability, commercial balance, and statutory grounding.
+
+Respond STRICTLY in valid JSON matching this schema:
 {{
-  "overall_risk_score": float (0.0 to 100.0),
-  "critical_issues": int,
-  "high_issues": int,
-  "medium_issues": int,
-  "low_issues": int,
-  "key_findings": ["string", ...],
-  "recommended_actions": ["string", ...],
-  "unresolved_questions": ["string", ...],
-  "summary": "comprehensive executive summary string",
+  "overall_risk_score": 38.5,
+  "critical_issues": 1,
+  "high_issues": 4,
+  "medium_issues": 8,
+  "low_issues": 10,
+  "key_findings": [
+    "Specific finding analyzing clause X and legal risk under Indian Law...",
+    "..."
+  ],
+  "recommended_actions": [
+    "Concrete negotiation or drafting revision recommendation...",
+    "..."
+  ],
+  "unresolved_questions": [
+    "Specific ambiguous commercial or legal point that must be clarified...",
+    "..."
+  ],
+  "summary": "Authoritative executive summary...",
   "additional_statutory_risks": [
     {{
-      "description": "...",
+      "description": "Risk description...",
       "category": "Compliance & Legal",
-      "severity": "CRITICAL|HIGH",
-      "affected_party": "...",
-      "mitigation": "..."
+      "severity": "HIGH",
+      "affected_party": "Lessee / Party Name",
+      "mitigation": "Recommended legal amendment..."
     }}
   ]
 }}
@@ -730,91 +805,50 @@ Respond ONLY in valid JSON matching this schema:
     resp = llm.invoke([HumanMessage(content=prompt)])
     content = resp.content.strip()
     
-    overall_score = 35.0
-    critical_c = 0
-    high_c = 0
-    medium_c = 0
-    low_c = 0
-    key_findings = []
-    recommended_actions = []
-    unresolved_questions = []
-    summary_text = ""
+    cleaned = content
+    if "```json" in cleaned:
+        cleaned = cleaned.split("```json")[1].split("```")[0].strip()
+    elif "```" in cleaned:
+        cleaned = cleaned.split("```")[1].split("```")[0].strip()
     
+    json_match = re.search(r"(\{.*\})", cleaned, re.DOTALL)
+    if json_match:
+        cleaned = json_match.group(1).strip()
+
     try:
-        cleaned = content
-        if "```json" in cleaned:
-            cleaned = cleaned.split("```json")[1].split("```")[0].strip()
-        elif "```" in cleaned:
-            cleaned = cleaned.split("```")[1].split("```")[0].strip()
-        
-        # Resilient JSON matching if extra text exists
-        json_match = re.search(r"(\{.*\})", cleaned, re.DOTALL)
-        if json_match:
-            cleaned = json_match.group(1).strip()
-
         data = json.loads(cleaned)
-        
-        overall_score = float(data.get("overall_risk_score", 35.0))
-        critical_c = int(data.get("critical_issues", 0))
-        high_c = int(data.get("high_issues", 0))
-        medium_c = int(data.get("medium_issues", 0))
-        low_c = int(data.get("low_issues", 0))
-        key_findings = data.get("key_findings", [])
-        recommended_actions = data.get("recommended_actions", [])
-        unresolved_questions = data.get("unresolved_questions", [])
-        summary_text = data.get("summary", "")
-        
-        # Add any additional statutory risks found from Kanoon
-        for ar in data.get("additional_statutory_risks", []):
-            risks.append(RiskItem(
-                description=ar.get("description", ""),
-                category=ar.get("category", "Compliance & Legal"),
-                severity=ar.get("severity", "HIGH"),
-                affected_party=ar.get("affected_party"),
-                mitigation=ar.get("mitigation"),
-                citation="Indian Kanoon Precedent / Statute"
-            ))
-            
     except Exception as e:
-        logger.warning(f"[node_risk_synthesis] JSON parsing error: {e}")
-        summary_text = f"Contract analysis completed for {state.get('contract_type', 'Contract')}. Extracted {len(clauses)} clauses and {len(obligations)} obligations."
+        logger.error(f"[node_risk_synthesis] Failed to parse Chief Legal Risk Assessor JSON: {e}\nRaw content:\n{content}")
+        raise ValueError(f"Chief Legal Risk Assessor failed to produce valid JSON: {e}")
 
-    # Robust fallbacks for key findings and unresolved questions if empty
-    if not key_findings:
-        key_findings = [
-            f"The agreement governs relationships between {', '.join(state.get('parties', []) or ['the parties'])} as a {state.get('contract_type', 'Commercial Contract')}.",
-            f"Identified {len(clauses)} substantive contractual clauses and {len(obligations)} categorized obligations.",
-            "Statutory review under the Indian Contract Act 1872 evaluated restraint of trade (Section 27) and liquidated damages enforceability (Section 74).",
-            f"Evaluated {len(risks)} prospective operational, financial, and legal risk exposures across the agreement.",
-        ]
+    # Parse overall risk score safely, handling any accidental percent string e.g. "45%"
+    raw_score = data.get("overall_risk_score", 35.0)
+    if isinstance(raw_score, str):
+        raw_score = float(raw_score.replace("%", "").strip())
+    overall_score = round(max(0.0, min(100.0, float(raw_score))), 1)
 
-    if not recommended_actions:
-        recommended_actions = [
-            "Conduct structured redline negotiation on indemnity and unlimited liability covenants.",
-            "Verify compliance with Indian Contract Act 1872 Sections 27 and 28 for dispute and restrictive covenants.",
-            "Define explicit caps and notification grace periods for default and operational triggers.",
-            "Obtain written confirmation and authorized corporate signatories before execution.",
-        ]
+    critical_c = int(data.get("critical_issues", 0))
+    high_c = int(data.get("high_issues", 0))
+    medium_c = int(data.get("medium_issues", 0))
+    low_c = int(data.get("low_issues", 0))
+    key_findings = data.get("key_findings") or []
+    recommended_actions = data.get("recommended_actions") or []
+    unresolved_questions = data.get("unresolved_questions") or []
+    summary_text = data.get("summary") or ""
 
-    if not unresolved_questions:
-        unresolved_questions = [
-            "Are there explicit monetary liability caps or aggregate caps defined across indemnification provisions?",
-            "Has the governing law, dispute resolution venue, and arbitration mechanism been mutually ratified?",
-            "What specific cure periods and written notice requirements apply before unilateral contract termination?",
-        ]
+    if not summary_text:
+        raise ValueError("Chief Legal Risk Assessor output missing required 'summary' field.")
 
-    # Compute fallback counts if zero
-    if critical_c == 0 and high_c == 0 and medium_c == 0 and low_c == 0:
-        for r in risks:
-            s = (r.severity or "").upper()
-            if s == "CRITICAL":
-                critical_c += 1
-            elif s == "HIGH":
-                high_c += 1
-            elif s == "MEDIUM":
-                medium_c += 1
-            else:
-                low_c += 1
+    # Add any additional statutory risks found from Kanoon
+    for ar in data.get("additional_statutory_risks", []):
+        risks.append(RiskItem(
+            description=ar.get("description", ""),
+            category=ar.get("category", "Compliance & Legal"),
+            severity=ar.get("severity", "HIGH"),
+            affected_party=ar.get("affected_party"),
+            mitigation=ar.get("mitigation"),
+            citation="Indian Kanoon Precedent / Statute"
+        ))
 
     return {
         "risks": risks,

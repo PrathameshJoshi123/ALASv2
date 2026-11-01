@@ -23,10 +23,10 @@ settings = get_settings()
 
 T = TypeVar("T")
 
-# Main orchestrator model: ministral-14b-2512
-ORCHESTRATOR_MODEL_NAME = "ministral-14b-2512"
-# Specialist agent model: ministral-3b-2512
-SPECIALIST_MODEL_NAME = "ministral-3b-2512"
+# Main orchestrator high-reasoning model: mistral-small-2603
+ORCHESTRATOR_MODEL_NAME = "mistral-small-2603"
+# Specialist agent model: ministral-8b-latest
+SPECIALIST_MODEL_NAME = "ministral-8b-latest"
 
 
 def is_rate_limit_or_transient_error(exc: Exception) -> bool:

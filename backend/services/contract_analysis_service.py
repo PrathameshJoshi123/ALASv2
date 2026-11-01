@@ -202,12 +202,16 @@ def save_contract_analysis_to_db(document_id: str, analysis_data: dict[str, Any]
             medium_issues = int(analysis_data.get("medium_issues") or med_count)
             low_issues = int(analysis_data.get("low_issues") or low_count)
 
-            # Calculate risk score if not explicitly set
+            # Store risk score directly from the legal analysis model
             raw_score = analysis_data.get("overall_risk_score")
-            if raw_score is None or float(raw_score) == 0.0:
-                overall_risk_score = min(100.0, float(critical_issues * 30 + high_issues * 20 + medium_issues * 10 + low_issues * 5))
+            if raw_score is not None and float(raw_score) > 0.0:
+                overall_risk_score = round(max(0.0, min(100.0, float(raw_score))), 1)
             else:
-                overall_risk_score = float(raw_score)
+                # Proportional legal risk calculation normalized across total clause density
+                total_clauses = max(1, len(clauses_json))
+                weighted_sum = (critical_issues * 20.0 + high_issues * 10.0 + medium_issues * 4.0 + low_issues * 0.5)
+                proportional_score = (weighted_sum / (total_clauses ** 0.6)) * 3.8
+                overall_risk_score = round(max(5.0, min(95.0, proportional_score)), 1)
 
             # Prepare legal sources
             raw_legal_sources = analysis_data.get("legal_sources", [])

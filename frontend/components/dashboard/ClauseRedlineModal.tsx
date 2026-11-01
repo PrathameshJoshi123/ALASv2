@@ -190,7 +190,7 @@ export function ClauseRedlineModal({
             </div>
           )}
 
-          {/* User Prompt Controls */}
+          {/* User Prompt Controls & Dynamic Suggestions */}
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
@@ -212,6 +212,52 @@ export function ClauseRedlineModal({
                     {mode}
                   </button>
                 ))}
+              </div>
+            </div>
+
+            {/* Dynamic Suggestion Chips */}
+            <div className="space-y-1.5">
+              <div className="text-[11px] font-semibold text-slate-500 flex items-center gap-1">
+                <span>Quick Legal Redraft Suggestions:</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {clause.risk_description && (
+                  <button
+                    type="button"
+                    onClick={() => setCustomPrompt(`Redraft to completely cure the identified vulnerability: ${clause.risk_description}. Ensure balanced and enforceable legal terms.`)}
+                    className="text-[11px] px-2.5 py-1 rounded-full bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 transition font-medium flex items-center gap-1"
+                  >
+                    <span>🛡️ Cure Identified Vulnerability</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setCustomPrompt("Make this clause mutual, bilateral, and commercially fair for both parties.")}
+                  className="text-[11px] px-2.5 py-1 rounded-full bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 transition font-medium"
+                >
+                  ⚖️ Make Mutual & Bilateral
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCustomPrompt("Add a mandatory 30-day written notice and cure period before any default or termination trigger can take effect.")}
+                  className="text-[11px] px-2.5 py-1 rounded-full bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 transition font-medium"
+                >
+                  ⏱️ Add 30-Day Cure Period
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCustomPrompt("Cap overall liability under this clause to 12 months' consideration/fees, and exclude indirect or consequential damages.")}
+                  className="text-[11px] px-2.5 py-1 rounded-full bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 transition font-medium"
+                >
+                  💰 Cap Liability to 12 Months
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCustomPrompt("Ensure strict statutory compliance with the Indian Contract Act 1872 (Sections 27, 28, 74) and eliminate void penalty stipulations.")}
+                  className="text-[11px] px-2.5 py-1 rounded-full bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 transition font-medium"
+                >
+                  📜 Ground in Indian Contract Act 1872
+                </button>
               </div>
             </div>
 
