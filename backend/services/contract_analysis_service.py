@@ -14,6 +14,7 @@ from backend.models.contract_analysis import (
     ContractRisk,
 )
 from backend.models.documents import Document
+from backend.schemas.contract_analysis_models import normalize_string_list
 
 logger = logging.getLogger(__name__)
 
@@ -228,17 +229,17 @@ def save_contract_analysis_to_db(document_id: str, analysis_data: dict[str, Any]
                 id=analysis_id,
                 document_id=document_id,
                 contract_type=analysis_data.get("contract_type"),
-                parties=analysis_data.get("parties", []),
+                parties=normalize_string_list(analysis_data.get("parties", []), "party"),
                 overall_risk_score=overall_risk_score,
                 critical_issues=critical_issues,
                 high_issues=high_issues,
                 medium_issues=medium_issues,
                 low_issues=low_issues,
-                recommended_actions=analysis_data.get("recommended_actions", []),
+                recommended_actions=normalize_string_list(analysis_data.get("recommended_actions", []), "action"),
                 clauses=clauses_json,
                 legal_sources=legal_sources_json,
-                key_findings=analysis_data.get("key_findings", []),
-                unresolved_questions=analysis_data.get("unresolved_questions", []),
+                key_findings=normalize_string_list(analysis_data.get("key_findings", []), "finding"),
+                unresolved_questions=normalize_string_list(analysis_data.get("unresolved_questions", []), "question"),
                 confidence=float(analysis_data.get("confidence", 0.85)),
                 analysis_complete=analysis_data.get("analysis_complete", True),
                 summary=analysis_data.get("summary") or analysis_data.get("analysis_summary") or ""

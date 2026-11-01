@@ -1,0 +1,32 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 2440 >>
+stream
+BT /F1 9 Tf 40 750 Td 14 TL (STATEMENT OF WITNESS UNDER SECTION 161 Cr.P.C. / SECTION 180 BNSS, 2023) ' (POLICE STATION: EOW, Mandir Marg, New Delhi | FIR NO: 0412/2024) ' (DATE OF EXAMINATION: 22/08/2024 | INVESTIGATING OFFICER: SI Devendra Chawla) ' (--------------------------------------------------------------------------------) ' (WITNESS IDENTIFICATION:) ' (Name: Sameer Verma, S/o Sh. V. K. Verma, Age: 39 Years) ' (Designation: Chief Technology Officer, Zenith Cloud Technologies Pvt. Ltd., New Delhi.) ' (--------------------------------------------------------------------------------) ' (WITNESS TESTIMONY & TECHNICAL DEFENCE:) ' (I am the CTO of Zenith Cloud Technologies Pvt. Ltd. and oversaw software architecture.) ' (I categorically deny any conspiracy, fraudulent misrepresentation, or cheating.) ' (Between January 2024 and June 2024, our 18-member engineering team built over 85,000 lines of modular) ' (Go and Python microservices for Apex FinTech's algorithmic clearing engine.) ' (The staging code was deployed on AWS Singapore instances with full CI/CD access provided to Apex engineers.) ' () ' (REGARDING THE THIRD-PARTY ESCROW DEPOSIT:) ' (CertiGuard Labs was an independent technical compliance audit firm recommended by our international partners.) ' (We submitted the complete SHA-256 cryptographic hash of the source code repository to CertiGuard on 02/02/2024.) ' (The escrow confirmation receipt was issued legitimately after cryptographic verification.) ' (We never suppressed any source code; in fact, on 08/08/2024, we sent a formal email offering full repository transfer) ' (subject to Apex settling the outstanding AWS infrastructure hosting invoice of INR 68,50,000/-.) ' () ' (REGARDING THE EVENTS OF 10/08/2024:) ' (On 10/08/2024 at 11:30 AM, Mr. Singhania and Mr. Gupta arrived unannounced and demanded instant master root keys.) ' (Mr. Malhotra explained that root keys could only be delivered upon signing the UAT handover and indemnity waiver.) ' (Mr. Singhania became infuriated, swept items off the conference table, and accidentally grazed his wrist against) ' (the sharp aluminium border of an open presentation easel.) ' (No employee of Zenith touched Mr. Singhania. CCTV footage of the boardroom foyer confirms this fact.) ' (The dispute is strictly a commercial contractual dispute governed by the DIAC arbitration clause in our agreement.) ' (Sd/- Sameer Verma \(Witness / CTO\).) ' ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000002733 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+2803
+%%EOF

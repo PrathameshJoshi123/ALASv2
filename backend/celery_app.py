@@ -12,7 +12,7 @@ load_dotenv()
 try:
     from celery import Celery
     from celery.schedules import crontab
-    # from celery.signals import setup_logging
+    from celery.signals import setup_logging
 except ImportError:
     Celery = None
     crontab = None

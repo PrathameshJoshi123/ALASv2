@@ -57,6 +57,24 @@ def chunk_document_task(
         
         # Import here to avoid circular imports
         from backend.database import SessionLocal
+        from backend.services.chunking.database import Chunk
+
+        # Cache Check: if chunks already exist in DB for this document_id, reuse them!
+        with SessionLocal() as db:
+            existing_chunks = db.query(Chunk).filter(Chunk.document_id == document_id).order_by(Chunk.sequence_number).all()
+            if existing_chunks and len(existing_chunks) > 0:
+                logger.info(f"[CACHE HIT] Document {document_id} already has {len(existing_chunks)} chunks in DB. Skipping re-chunking and reusing cache!")
+                try:
+                    from backend.services.vector_storage import store_chunks_in_vector_db
+                    store_chunks_in_vector_db(existing_chunks, document_id)
+                except Exception as embed_err:
+                    logger.warning(f"Chroma sync for cached chunks: {embed_err}")
+                return {
+                    "status": "success",
+                    "document_id": document_id,
+                    "chunks_count": len(existing_chunks),
+                    "cached": True,
+                }
         
         # Create pipeline
         if config:
@@ -145,6 +163,24 @@ def rechunk_document_task(
         
         from sqlalchemy import select
         from backend.database import SessionLocal
+        from backend.services.chunking.database import Chunk
+
+        # Cache Check: if chunks already exist in DB for this document_id, reuse them!
+        with SessionLocal() as db:
+            existing_chunks = db.query(Chunk).filter(Chunk.document_id == document_id).order_by(Chunk.sequence_number).all()
+            if existing_chunks and len(existing_chunks) > 0:
+                logger.info(f"[CACHE HIT] Document {document_id} already has {len(existing_chunks)} chunks in DB. Skipping re-chunking and reusing cache!")
+                try:
+                    from backend.services.vector_storage import store_chunks_in_vector_db
+                    store_chunks_in_vector_db(existing_chunks, document_id)
+                except Exception as embed_err:
+                    logger.warning(f"Chroma sync for cached chunks: {embed_err}")
+                return {
+                    "status": "success",
+                    "document_id": document_id,
+                    "chunks_count": len(existing_chunks),
+                    "cached": True,
+                }
         from backend.models.documents import Document
         from backend.services.chunking.pipeline import create_pipeline
         from backend.services.chunking.database import (
@@ -288,6 +324,24 @@ def embed_document_chunks_task(
     try:
         logger.info(f"Starting manual embedding task for document: {document_id}")
         from backend.database import SessionLocal
+        from backend.services.chunking.database import Chunk
+
+        # Cache Check: if chunks already exist in DB for this document_id, reuse them!
+        with SessionLocal() as db:
+            existing_chunks = db.query(Chunk).filter(Chunk.document_id == document_id).order_by(Chunk.sequence_number).all()
+            if existing_chunks and len(existing_chunks) > 0:
+                logger.info(f"[CACHE HIT] Document {document_id} already has {len(existing_chunks)} chunks in DB. Skipping re-chunking and reusing cache!")
+                try:
+                    from backend.services.vector_storage import store_chunks_in_vector_db
+                    store_chunks_in_vector_db(existing_chunks, document_id)
+                except Exception as embed_err:
+                    logger.warning(f"Chroma sync for cached chunks: {embed_err}")
+                return {
+                    "status": "success",
+                    "document_id": document_id,
+                    "chunks_count": len(existing_chunks),
+                    "cached": True,
+                }
         from backend.services.chunking.database import get_chunks_by_document
         from backend.services.vector_storage import store_chunks_in_vector_db, delete_chunks_from_vector_db
         

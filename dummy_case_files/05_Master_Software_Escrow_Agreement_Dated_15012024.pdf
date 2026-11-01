@@ -1,0 +1,32 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 2594 >>
+stream
+BT /F1 9 Tf 40 750 Td 14 TL (MASTER SOFTWARE DEPLOYMENT AND ESCROW AGREEMENT) ' (EXECUTED AT NEW DELHI ON THIS 15TH DAY OF JANUARY, 2024) ' (BY AND BETWEEN: Apex FinTech Innovations Ltd. \('Customer'\) AND Zenith Cloud Technologies Pvt. Ltd. \('Vendor'\)) ' (--------------------------------------------------------------------------------) ' (RECITALS & OPERATIVE COVENANTS:) ' (WHEREAS Vendor possesses algorithmic software for automated core loan disbursements and settlements;) ' (AND WHEREAS Customer desires to license said software and engage Vendor for turnkey deployment;) ' (NOW THEREFORE THE PARTIES AGREE AS FOLLOWS:) ' () ' (CLAUSE 2: CONTRACTUAL CONSIDERATION & PAYMENT MILESTONES:) ' (Total Contract Price: INR 8,50,00,000/- \(Eight Crores Fifty Lakhs\) plus applicable GST.) ' (Milestone 1: 50% \(INR 4,25,00,000/-\) payable upon execution and delivery of Source Code Escrow Confirmation.) ' (Milestone 2: 30% \(INR 2,55,00,000/-\) payable upon User Acceptance Testing \(UAT\) sign-off.) ' (Milestone 3: 20% \(INR 1,70,00,000/-\) payable upon 90 days of commercial live production.) ' () ' (CLAUSE 9: ESCROW DEPOSIT AND TECHNICAL SPECIFICATIONS:) ' (Vendor covenants to deposit source code and encryption keys into escrow with CertiGuard Labs or any mutually) ' (approved escrow custodian. In the event of dispute over vendor capabilities, audit rights shall be exercised.) ' () ' (CLAUSE 18: GOVERNING LAW AND EXCLUSIVE DISPUTE RESOLUTION \(ARBITRATION\):) ' (18.1 This Agreement shall be governed by and construed in accordance with the substantive laws of India.) ' (18.2 All disputes, controversies, or claims arising out of or in connection with this Agreement, including any) ' (question regarding its existence, validity, breach, or termination, shall be referred to and finally resolved) ' (by Arbitration administered by the Delhi International Arbitration Centre \(DIAC\) in accordance with DIAC Rules.) ' (18.3 The seat and venue of arbitration shall be New Delhi. The arbitral tribunal shall consist of a Sole Arbitrator.) ' (18.4 The parties expressly agree that breach of delivery milestones shall constitute a purely civil commercial) ' (breach remediable exclusively through liquidated damages capped at 15% of contract value or specific performance.) ' (Neither party shall initiate penal or criminal proceedings in respect of milestone delay or technical variances.) ' () ' (IN WITNESS WHEREOF, the authorized signatories have executed this Agreement on 15/01/2024.) ' (Sd/- Vikramaditya Singhania \(Apex FinTech\) | Sd/- Rajesh Malhotra \(Zenith Cloud\)) ' ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000002887 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+2957
+%%EOF

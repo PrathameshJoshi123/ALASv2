@@ -18,6 +18,7 @@ from sqlalchemy import select
 from backend.database import SessionLocal
 from backend.models.contract_draft import ContractDraft, ContractDraftVersion
 from backend.models.documents import Document
+from backend.schemas.contract_analysis_models import normalize_string_list
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,9 @@ def save_or_update_draft_in_db(
     # Strip accidental wrapping markdown code fences if present
     cleaned_content = re.sub(r"^[ \t]*```[a-zA-Z0-9_-]*[ \t]*$", "", cleaned_content, flags=re.MULTILINE)
     cleaned_content = re.sub(r"\n{3,}", "\n\n", cleaned_content).strip()
+
+    if parties is not None:
+        parties = normalize_string_list(parties, "party")
 
     with SessionLocal() as db:
         # Check if draft record exists

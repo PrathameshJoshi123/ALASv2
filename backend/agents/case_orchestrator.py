@@ -37,6 +37,8 @@ from backend.utils.llm_utils import (
     get_resilient_llm,
     ORCHESTRATOR_MODEL_NAME,
     SPECIALIST_MODEL_NAME,
+    safe_parse_json,
+    clean_json_response,
 )
 from backend.tools.indian_kanoon_tools import (
     search_indian_kanoon_raw,

@@ -3,6 +3,7 @@ Vector Storage Service for embedding and storing chunks in Chroma DB.
 """
 
 import json
+import uuid
 import logging
 from typing import Any, List, Optional
 from langchain_core.documents import Document as LCDocument
@@ -112,16 +113,17 @@ def store_chunks_in_vector_db(chunks: List[Chunk], document_id: str) -> None:
             # Build unified metadata
             metadata = {
                 "document_id": document_id,
-                "chunk_id": chunk.chunk_id,
-                "page_start": chunk.page_start,
-                "page_end": chunk.page_end,
-                "unit_type": chunk.unit_type,
-                "sequence_number": chunk.sequence_number,
+                "chunk_id": str((getattr(chunk, "chunk_id", None) or (chunk.get("chunk_id") if isinstance(chunk, dict) else None)) or uuid.uuid4()),
+                "page_start": getattr(chunk, "page_start", None) or (chunk.get("page_start") if isinstance(chunk, dict) else None),
+                "page_end": getattr(chunk, "page_end", None) or (chunk.get("page_end") if isinstance(chunk, dict) else None),
+                "unit_type": getattr(chunk, "unit_type", None) or (chunk.get("unit_type") if isinstance(chunk, dict) else "paragraph"),
+                "sequence_number": getattr(chunk, "sequence_number", None) or (chunk.get("sequence_number") if isinstance(chunk, dict) else 0),
             }
             
             # Merge extra chunk metadata if available
-            if chunk.chunk_metadata:
-                for k, v in chunk.chunk_metadata.items():
+            extra_meta = getattr(chunk, "chunk_metadata", None) or (chunk.get("metadata") if isinstance(chunk, dict) else None)
+            if extra_meta and isinstance(extra_meta, dict):
+                for k, v in extra_meta.items():
                     if k not in metadata:
                         metadata[k] = v
             
@@ -138,11 +140,11 @@ def store_chunks_in_vector_db(chunks: List[Chunk], document_id: str) -> None:
                     clean_metadata[k] = str(v)
             
             doc = LCDocument(
-                page_content=chunk.content,
+                page_content=getattr(chunk, "content", None) or (chunk.get("content") or chunk.get("text") if isinstance(chunk, dict) else ""),
                 metadata=clean_metadata
             )
             lc_docs.append(doc)
-            ids.append(chunk.chunk_id)
+            ids.append(metadata["chunk_id"])
             
         vectorstore.add_documents(documents=lc_docs, ids=ids)
         logger.info(f"Successfully stored {len(chunks)} chunks in Chroma DB for document {document_id}")

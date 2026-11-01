@@ -264,9 +264,13 @@ def analyze_case_task(self, case_id: str) -> dict[str, Any]:
 
             if isinstance(result_data, str):
                 try:
-                    result_data = json.loads(result_data)
-                except ValueError:
-                    result_data = {"raw_report": result_data}
+                    from backend.utils.llm_utils import safe_parse_json
+                    result_data = safe_parse_json(result_data)
+                except Exception:
+                    try:
+                        result_data = json.loads(result_data, strict=False)
+                    except Exception:
+                        result_data = {"raw_report": result_data}
 
             # Cache report to storage output file
             try:

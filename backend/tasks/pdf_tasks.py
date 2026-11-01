@@ -98,6 +98,26 @@ def process_pdf_task(
                 "output_file": str(output_file),
             }
         
+        # Check extraction cache
+        output_dir = Path("backend/storage/output")
+        output_file = output_dir / f"{document_id}.json"
+        if output_file.exists():
+            try:
+                with open(output_file, "r", encoding="utf-8") as f:
+                    cached_data = json.load(f)
+                    if cached_data.get("elements"):
+                        logger.info(f"[CACHE HIT] Reusing {len(cached_data['elements'])} cached PDF elements for document: {document_id}")
+                        return {
+                            "status": "success",
+                            "document_id": document_id,
+                            "elements_count": len(cached_data["elements"]),
+                            "elements": cached_data["elements"],
+                            "output_file": str(output_file),
+                            "cached": True,
+                        }
+            except Exception as e:
+                logger.warning(f"Could not read cache file {output_file}: {e}")
+
         # Process PDF
         elements = pdf_service.process_pdf(
             file_path=storage_path,

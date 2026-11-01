@@ -16,7 +16,7 @@ import logging
 import re
 from pathlib import Path
 from typing import Annotated, Any, Dict, List, Literal, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing_extensions import TypedDict
 
 from langchain_core.messages import (
@@ -155,6 +155,35 @@ class DraftingReviewVerdict(BaseModel):
     positive_findings: List[str] = Field(default_factory=list)
 
 
+
+def normalize_parties_list(parties: Any) -> list[str]:
+    """Normalize contracting parties into a list of clean strings, safely handling dicts, lists, or strings."""
+    if not parties:
+        return []
+    if isinstance(parties, str):
+        return [parties.strip()]
+    if not isinstance(parties, (list, tuple)):
+        return [str(parties)]
+    
+    normalized = []
+    for p in parties:
+        if isinstance(p, dict):
+            name = p.get("name") or p.get("entity") or p.get("party") or ""
+            role = p.get("role") or p.get("designation") or ""
+            if name and role:
+                normalized.append(f"{name} ({role})")
+            elif name:
+                normalized.append(str(name))
+            elif role:
+                normalized.append(str(role))
+            else:
+                normalized.append(json.dumps(p))
+        elif isinstance(p, (list, tuple)):
+            normalized.append(", ".join([str(item) for item in p]))
+        elif p is not None:
+            normalized.append(str(p).strip())
+    return [item for item in normalized if item]
+
 class ContractDraftingResult(BaseModel):
     contract_title: str
     contract_type: str
@@ -164,6 +193,11 @@ class ContractDraftingResult(BaseModel):
     legal_citations: List[Dict[str, Any]] = Field(default_factory=list)
     review_comments: str = ""
     is_complete: bool = True
+
+    @field_validator("parties", mode="before")
+    @classmethod
+    def _validate_parties(cls, v: Any) -> List[str]:
+        return normalize_parties_list(v)
 
 
 # ============================================================
@@ -212,17 +246,23 @@ class ContractDraftingGraphState(TypedDict):
 # ============================================================
 
 def clean_and_parse_json(content: str, fallback_value: Any = None) -> Any:
-    """Clean markdown fence and parse JSON."""
-    try:
-        cleaned = content.strip()
-        if "```json" in cleaned:
-            cleaned = cleaned.split("```json")[1].split("```")[0].strip()
-        elif "```" in cleaned:
-            cleaned = cleaned.split("```")[1].split("```")[0].strip()
-        return json.loads(cleaned)
-    except Exception as e:
-        logger.warning(f"clean_and_parse_json error: {e}. Raw content snippet: {content[:200]}")
+    """Clean markdown fence and parse JSON robustly."""
+    if not content:
         return fallback_value
+    try:
+        from backend.utils.llm_utils import safe_parse_json
+        return safe_parse_json(content)
+    except Exception as e:
+        logger.warning(f"clean_and_parse_json primary error: {e}. Attempting strict=False fallback.")
+        try:
+            cleaned = content.strip()
+            if "```json" in cleaned:
+                cleaned = cleaned.split("```json")[1].split("```")[0].strip()
+            elif "```" in cleaned:
+                cleaned = cleaned.split("```")[1].split("```")[0].strip()
+            return json.loads(cleaned, strict=False)
+        except Exception:
+            return fallback_value
 
 
 def strip_markdown_code_fences(content: str) -> str:
@@ -342,6 +382,7 @@ Respond ONLY in valid JSON with keys:
 "contract_title": string,
 "contract_type": string,
 "parties": list of strings
+NOTE: "parties" MUST be a list of plain strings (e.g. ["Party A (Client)", "Party B (Provider)"]), NOT objects or dictionaries.
 """
         response = llm.invoke([HumanMessage(content=prompt)])
         parsed = clean_and_parse_json(response.content, fallback_value={})
@@ -352,6 +393,10 @@ Respond ONLY in valid JSON with keys:
 
         if not parties:
             parties = parsed.get("parties", ["Party A (Client)", "Party B (Provider)"])
+
+    parties = normalize_parties_list(parties)
+    if not parties:
+        parties = ["Party A (Client)", "Party B (Provider)"]
 
     DraftingStreamService.publish_event(
         document_id=doc_id,
@@ -476,7 +521,7 @@ Respond ONLY in valid JSON with an array:
     favor_party = state.get("favor_party", "Balanced")
     governing_law = state.get("governing_law", "Indian Contract Act, 1872")
     drafting_style = state.get("drafting_style", "Institutional Legal")
-    parties = state.get("parties", ["Party A", "Party B"])
+    parties = normalize_parties_list(state.get("parties", ["Party A", "Party B"])) or ["Party A", "Party B"]
 
     if not blueprint:
         prompt = f"""You are a Master Legal Drafter under Indian Law.
@@ -694,7 +739,7 @@ def node_section_writer(state: ContractDraftingGraphState) -> Dict[str, Any]:
     doc_id = state["document_id"]
     mode = state["mode"]
     contract_type = state["contract_type"]
-    parties = state.get("parties", ["Party A", "Party B"])
+    parties = normalize_parties_list(state.get("parties", ["Party A", "Party B"])) or ["Party A", "Party B"]
     user_instructions = state.get("user_instructions", "")
     blueprint = state.get("blueprint", [])
     research = state.get("legal_research_findings", [])
@@ -1029,7 +1074,7 @@ def node_final_assembly(state: ContractDraftingGraphState) -> Dict[str, Any]:
     doc_id = state["document_id"]
     contract_md = strip_markdown_code_fences(state["current_draft_markdown"])
     contract_type = state.get("contract_type", "Commercial Contract")
-    parties = state.get("parties", [])
+    parties = normalize_parties_list(state.get("parties", [])) or ["Party A", "Party B"]
     blueprint = state.get("blueprint", [])
     research = state.get("legal_research_findings", [])
     verdict = state.get("review_verdict") or {}

@@ -312,8 +312,9 @@ def node_petitioner_counsel(state: TrialDebateState) -> Dict[str, Any]:
         round_number=current_round,
     )
     
-    # 1. Autonomous Kanoon research
-    citations = autonomous_kanoon_research("cheating breach of contract 420 482", "petitioner", max_results=1)
+    # 1. Autonomous Kanoon research based on actual case issue
+    search_query = f"{issue} {title}".strip()[:60]
+    citations = autonomous_kanoon_research(search_query or "maintainability quashing criminal", "petitioner", max_results=1)
     cit_meta = citations[0] if citations else {}
     
     # 2. Dynamic LLM Argument synthesis
@@ -402,8 +403,9 @@ def node_respondent_counsel(state: TrialDebateState) -> Dict[str, Any]:
         round_number=current_round,
     )
     
-    # 1. Autonomous Kanoon research for counter-authority
-    citations = autonomous_kanoon_research("Dalip Kaur commercial dispute cheating criminalize", "respondent", max_results=1)
+    # 1. Autonomous Kanoon research for counter-authority based on actual issue
+    search_query = f"{issue} defense quashing".strip()[:60]
+    citations = autonomous_kanoon_research(search_query or "quashing absence of mens rea", "respondent", max_results=1)
     cit_meta = citations[0] if citations else {}
     
     # 2. Dynamic LLM Counter-argument synthesis

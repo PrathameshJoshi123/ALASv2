@@ -32,6 +32,8 @@ from backend.utils.llm_utils import (
     get_resilient_llm,
     ORCHESTRATOR_MODEL_NAME,
     SPECIALIST_MODEL_NAME,
+    safe_parse_json,
+    execute_with_exponential_backoff,
 )
 from backend.tools.indian_kanoon_tools import (
     search_indian_kanoon,
@@ -46,6 +48,7 @@ from backend.schemas.contract_analysis_models import (
     RiskItem,
     LegalSourceItem,
     ContractAnalysisResult,
+    normalize_string_list,
 )
 
 logger = logging.getLogger(__name__)
@@ -252,7 +255,7 @@ Respond STRICTLY in valid JSON matching this schema:
 }}
 """
 
-    response = llm.invoke([HumanMessage(content=prompt)])
+    response = execute_with_exponential_backoff(llm.invoke, [HumanMessage(content=prompt)])
     content = response.content.strip()
     
     if "```json" in content:
@@ -267,7 +270,7 @@ Respond STRICTLY in valid JSON matching this schema:
         cleaned = json_match.group(1).strip()
 
     try:
-        data = json.loads(cleaned)
+        data = safe_parse_json(cleaned)
     except Exception as e:
         logger.error(f"[node_document_intake] Failed to parse document intake JSON: {e}\nRaw content:\n{content}")
         raise ValueError(f"Document intake classification failed to produce valid JSON: {e}")
@@ -395,14 +398,14 @@ Respond ONLY in valid JSON matching this schema:
 """
 
         try:
-            resp = llm.invoke([HumanMessage(content=prompt)])
+            resp = execute_with_exponential_backoff(llm.invoke, [HumanMessage(content=prompt)])
             cleaned = resp.content.strip()
             if "```json" in cleaned:
                 cleaned = cleaned.split("```json")[1].split("```")[0].strip()
             elif "```" in cleaned:
                 cleaned = cleaned.split("```")[1].split("```")[0].strip()
             
-            data = json.loads(cleaned)
+            data = safe_parse_json(cleaned)
             
             # Append extracted clauses
             for idx, c in enumerate(data.get("clauses", [])):
@@ -557,7 +560,7 @@ def node_autonomous_legal_advisor(state: ContractAnalysisGraphState) -> Dict[str
     messages = state["messages"]
     logger.info(f"[LangGraph: node_autonomous_legal_advisor] Invoking legal model (Turn {state['research_turn']}/{MAX_LEGAL_RESEARCH_TURNS})...")
     
-    response = llm_with_tools.invoke(messages)
+    response = execute_with_exponential_backoff(llm_with_tools.invoke, messages)
     
     return {
         "messages": [response],
@@ -800,9 +803,10 @@ Respond STRICTLY in valid JSON matching this schema:
     }}
   ]
 }}
+IMPORTANT: "key_findings", "recommended_actions", and "unresolved_questions" must each be a list of plain strings (NOT objects or dictionaries).
 """
 
-    resp = llm.invoke([HumanMessage(content=prompt)])
+    resp = execute_with_exponential_backoff(llm.invoke, [HumanMessage(content=prompt)])
     content = resp.content.strip()
     
     cleaned = content
@@ -816,7 +820,7 @@ Respond STRICTLY in valid JSON matching this schema:
         cleaned = json_match.group(1).strip()
 
     try:
-        data = json.loads(cleaned)
+        data = safe_parse_json(cleaned)
     except Exception as e:
         logger.error(f"[node_risk_synthesis] Failed to parse Chief Legal Risk Assessor JSON: {e}\nRaw content:\n{content}")
         raise ValueError(f"Chief Legal Risk Assessor failed to produce valid JSON: {e}")
@@ -831,9 +835,9 @@ Respond STRICTLY in valid JSON matching this schema:
     high_c = int(data.get("high_issues", 0))
     medium_c = int(data.get("medium_issues", 0))
     low_c = int(data.get("low_issues", 0))
-    key_findings = data.get("key_findings") or []
-    recommended_actions = data.get("recommended_actions") or []
-    unresolved_questions = data.get("unresolved_questions") or []
+    key_findings = normalize_string_list(data.get("key_findings") or [], "finding")
+    recommended_actions = normalize_string_list(data.get("recommended_actions") or [], "action")
+    unresolved_questions = normalize_string_list(data.get("unresolved_questions") or [], "question")
     summary_text = data.get("summary") or ""
 
     if not summary_text:
@@ -875,19 +879,19 @@ def node_final_validation(state: ContractAnalysisGraphState) -> Dict[str, Any]:
     """
     final_obj = ContractAnalysisResult(
         contract_type=state.get("contract_type", "Commercial Contract"),
-        parties=state.get("parties", []),
+        parties=normalize_string_list(state.get("parties", []), "party"),
         overall_risk_score=state.get("overall_risk_score", 0.0),
         critical_issues=state.get("critical_issues", 0),
         high_issues=state.get("high_issues", 0),
         medium_issues=state.get("medium_issues", 0),
         low_issues=state.get("low_issues", 0),
-        key_findings=state.get("key_findings", []),
-        recommended_actions=state.get("recommended_actions", []),
+        key_findings=normalize_string_list(state.get("key_findings", []), "finding"),
+        recommended_actions=normalize_string_list(state.get("recommended_actions", []), "action"),
         clauses=state.get("clauses", []),
         obligations=state.get("obligations", []),
         risks=state.get("risks", []),
         legal_sources=state.get("legal_sources", []),
-        unresolved_questions=state.get("unresolved_questions", []),
+        unresolved_questions=normalize_string_list(state.get("unresolved_questions", []), "question"),
         confidence=0.92,
         analysis_complete=True,
         summary=state.get("summary", ""),

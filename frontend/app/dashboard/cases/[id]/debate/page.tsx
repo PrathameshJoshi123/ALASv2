@@ -266,9 +266,20 @@ export default function PreTrialDebatePage() {
           }
           reconstructRoundsFromBackend(debateStatus);
         } else {
-          apiClient.startCaseDebate(caseId).catch((e) => {
-            console.warn("Auto-start skipped, utilizing baseline simulation.", e);
-          });
+          setLiveAgentStatus("Synthesizing dynamic courtroom arguments from case exhibits...");
+          try {
+            const started = await apiClient.startCaseDebate(caseId);
+            if (started?.debate_turns && started.debate_turns.length > 0) {
+              if (started.framed_issues && started.framed_issues.length > 0) {
+                setFramedIssues(started.framed_issues);
+              }
+              reconstructRoundsFromBackend(started);
+            }
+          } catch (e) {
+            console.warn("Auto-start skipped or failed, using baseline simulation.", e);
+          } finally {
+            setLiveAgentStatus(null);
+          }
         }
       } catch (err) {
         console.warn("Could not load backend debate status, utilizing baseline simulation.", err);

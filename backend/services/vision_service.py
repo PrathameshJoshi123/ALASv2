@@ -75,7 +75,7 @@ def analyze_case_image(image_path: Path | str) -> Dict[str, Any]:
             "detected_timeline_event": "a brief 1-sentence summary of the event represented by this image for a chronology timeline, or null if none"
         }
         
-        Ensure your output contains ONLY the raw JSON object. Do not wrap in markdown or add explanations.
+        Ensure your output contains ONLY the raw JSON object. Do not wrap in markdown or add explanations. Escape all inner quotes and newlines inside string values properly.
         """
         
         message = HumanMessage(
@@ -88,17 +88,25 @@ def analyze_case_image(image_path: Path | str) -> Dict[str, Any]:
             ]
         )
         
-        response = client.invoke([message])
-        content = response.content.strip()
+        from backend.utils.llm_utils import safe_parse_json, execute_with_exponential_backoff
+
+        response = execute_with_exponential_backoff(client.invoke, [message])
+        content = response.content.strip() if hasattr(response, "content") else str(response).strip()
         
-        # Clean markdown code block wraps if present
-        if content.startswith("```json"):
-            content = content[7:]
-        if content.endswith("```"):
-            content = content[:-3]
-        content = content.strip()
-        
-        parsed_result = json.loads(content)
+        # Robust multi-pass JSON parsing handling unescaped control characters & markdown
+        try:
+            parsed_result = safe_parse_json(content)
+        except Exception as parse_err:
+            logger.warning(f"safe_parse_json failed on vision output: {parse_err}. Attempting fallback with strict=False.")
+            cleaned = content
+            if "```json" in cleaned:
+                cleaned = cleaned.split("```json")[1].split("```")[0].strip()
+            elif "```" in cleaned:
+                cleaned = cleaned.split("```")[1].split("```")[0].strip()
+            parsed_result = json.loads(cleaned, strict=False)
+
+        if not isinstance(parsed_result, dict):
+            raise ValueError(f"Vision model response was not a JSON dictionary: {parsed_result}")
         
         # Format validate fields
         result = {

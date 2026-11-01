@@ -1,0 +1,32 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 2350 >>
+stream
+BT /F1 9 Tf 40 750 Td 14 TL (SEIZURE MEMO AND PANCHNAMA \(Under Section 102 Cr.P.C. / Section 106 BNSS, 2023\)) ' (POLICE STATION: EOW, Mandir Marg, New Delhi | FIR NO: 0412/2024) ' (DATE OF SEIZURE: 24/08/2024 | TIME: 03:30 PM to 06:15 PM IST) ' (LOCATION: Registered Office of Zenith Cloud Technologies Pvt. Ltd., Okhla Phase-III, New Delhi.) ' (INVESTIGATING OFFICER: SI Devendra Chawla, EOW Mandir Marg.) ' (--------------------------------------------------------------------------------) ' (PANCH WITNESSES RECORDED IN MEMO:) ' (1. Head Constable Satbir Singh, No. 892/EOW, Delhi Police \(Police Official / Non-Independent\).) ' (2. Constable Virender Kumar, No. 1104/EOW, Delhi Police \(Police Official / Non-Independent\).) ' (--------------------------------------------------------------------------------) ' (DESCRIPTION OF ARTICLES AND ELECTRONIC RECORDS SEIZED:) ' (Item 1: One Lenovo ThinkPad P1 Gen 6 Laptop \(Serial No. LNV-88219-X\) purportedly used by CTO Sameer Verma.) ' (Item 2: Hard disk partition clone containing Git repository backups and escrow correspondence files.) ' (Item 3: Bank account statements of Zenith Cloud Technologies Pvt. Ltd. \(HDFC Bank Okhla Branch A/c 502000318921\).) ' (Item 4: One paper binder containing duplicate carbon copy of Master Software Agreement dated 15/01/2024.) ' () ' (SEIZURE PROCEDURE AND OBSERVATIONS:) ' (The electronic devices were seized from the open technical bay without using static-shielded anti-tamper forensic bags.) ' (Hash values \(MD5 / SHA-256\) of the seized storage drive were NOT generated at the time and spot of seizure.) ' (No independent civilian or public witnesses from the commercial industrial locality were joined in the Panchnama.) ' (Both memo witnesses are subordinate police officers attached to the same police station.) ' () ' (PROCEDURAL COMPLIANCE DEFICIENCIES NOTED FOR DEFENCE BRIEF:) ' (1. Violation of Section 100\(4\) CrPC / Section 103 BNSS: Failure to join two independent and respectable inhabitants.) ' (2. Violation of Delhi High Court Forensic Guidelines: Failure to generate cryptographic SHA-256 hash at the seizure locus.) ' (3. Missing Section 65B Indian Evidence Act / Section 63 BSA Certificate for the seized electronic files.) ' (Sd/- SI Devendra Chawla \(IO\) | Sd/- HC Satbir Singh \(Panch 1\) | Sd/- Ct Virender \(Panch 2\)) ' ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000002643 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+2713
+%%EOF
