@@ -14,6 +14,7 @@ import {
   Upload,
   Trash2,
   AlertCircle,
+  Gavel,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { apiClient } from "@/services/api";
@@ -220,12 +221,25 @@ export default function CasesPage() {
 
               <CardContent className="pt-0 border-t border-border/60 py-3 flex items-center justify-between text-xs">
                 <span className="font-semibold text-muted-foreground">
-                  {c.documents_count || 0} Exhibits / Filings
+                  {c.documents_count || 0} Exhibits
                 </span>
-                <span className="text-accent hover:underline font-semibold flex items-center gap-1">
-                  <span>Workspace</span>
-                  <ChevronRight className="w-3 h-3" />
-                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push(`/dashboard/cases/${c.id}/debate`);
+                    }}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded border border-blue-200 bg-blue-50/70 hover:bg-blue-100/80 text-[11px] font-semibold text-blue-900 transition-colors"
+                  >
+                    <Gavel className="w-3 h-3 text-[#2563EB]" />
+                    <span>Pre-Trial Debate</span>
+                  </button>
+                  <span className="text-accent hover:underline font-semibold flex items-center gap-0.5">
+                    <span>Workspace</span>
+                    <ChevronRight className="w-3 h-3" />
+                  </span>
+                </div>
               </CardContent>
             </Card>
           ))}

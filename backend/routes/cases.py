@@ -544,3 +544,320 @@ def get_case_agent_logs(
         "logs": all_logs
     }
 
+
+
+# ============================================================
+# Pre-Trial Adversarial Debate Endpoints
+# ============================================================
+
+from fastapi.responses import StreamingResponse
+from backend.services.debate_stream_service import DebateStreamService
+from backend.agents.trial_debate_langgraph import (
+    build_trial_debate_graph,
+    autonomous_kanoon_research,
+    TrialDebateState,
+    _call_resilient_llm_text,
+)
+
+
+class DebateStartRequest(BaseModel):
+    mode: Optional[str] = "adversarial"
+    represented_side: Optional[str] = "petitioner"
+
+
+class DebateTurnRequest(BaseModel):
+    custom_argument: str = Field(..., example="Plead lack of Section 65B certificate under Arjun Panditrao Khotkar.")
+    represented_side: Optional[str] = "petitioner"
+
+
+@router.post(
+    "/{case_id}/debate/start",
+    summary="Initialize or restart pre-trial adversarial debate simulation"
+)
+def start_case_debate(
+    case_id: str,
+    payload: Optional[DebateStartRequest] = None,
+    db: Session = Depends(get_db)
+) -> dict:
+    """
+    Kicks off the pre-trial moot simulation using LangGraph.
+    Frames issues, runs opening round, and stores initial state.
+    """
+    case = db.execute(select(Case).where(Case.id == case_id)).scalar_one_or_none()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    title = case.title or "Litigation Matter Dossier"
+    mode = payload.mode if payload else "adversarial"
+    side = payload.represented_side if payload else "petitioner"
+
+    # Compile and execute initial graph stage
+    graph = build_trial_debate_graph()
+    initial_state: TrialDebateState = {
+        "case_id": case_id,
+        "matter_title": title,
+        "case_facts": "",
+        "framed_issues": [],
+        "current_round": 1,
+        "max_rounds": 3,
+        "active_speaker": "petitioner",
+        "debate_turns": [],
+        "bench_queries": [],
+        "all_citations": [],
+        "momentum_petitioner": 55,
+        "human_intervention_pending": False,
+        "user_custom_argument": None,
+        "user_represented_side": side,
+        "is_completed": False,
+        "final_combat_brief": {},
+    }
+
+    try:
+        final_state = graph.invoke(initial_state)
+    except Exception as e:
+        logger.error(f"Error executing debate graph for case {case_id}: {e}")
+        final_state = initial_state
+
+    # Save to CaseAgentMemory
+    mem = db.execute(
+        select(CaseAgentMemory)
+        .where(CaseAgentMemory.case_id == case_id)
+        .where(CaseAgentMemory.memory_key == "active_debate_state")
+    ).scalar_one_or_none()
+
+    save_payload = {
+        "case_id": case_id,
+        "matter_title": title,
+        "current_round": final_state.get("current_round", 1),
+        "framed_issues": final_state.get("framed_issues", []),
+        "debate_turns": final_state.get("debate_turns", []),
+        "bench_queries": final_state.get("bench_queries", []),
+        "all_citations": final_state.get("all_citations", []),
+        "momentum_petitioner": final_state.get("momentum_petitioner", 55),
+        "is_completed": final_state.get("is_completed", False),
+    }
+
+    if mem:
+        mem.memory_value = save_payload
+        mem.updated_at = datetime.now()
+    else:
+        new_mem = CaseAgentMemory(
+            case_id=case_id,
+            agent_name="trial_debate_orchestrator",
+            memory_key="active_debate_state",
+            memory_value=save_payload,
+        )
+        db.add(new_mem)
+    db.commit()
+
+    return save_payload
+
+
+@router.get(
+    "/{case_id}/debate/status",
+    summary="Retrieve current debate state and argumentation ledger"
+)
+def get_case_debate_status(
+    case_id: str,
+    db: Session = Depends(get_db)
+) -> dict:
+    """Returns active debate state from DB or memory fallback."""
+    mem = db.execute(
+        select(CaseAgentMemory)
+        .where(CaseAgentMemory.case_id == case_id)
+        .where(CaseAgentMemory.memory_key == "active_debate_state")
+    ).scalar_one_or_none()
+
+    if mem:
+        return mem.memory_value
+
+    return {
+        "case_id": case_id,
+        "status": "not_started",
+        "debate_turns": [],
+        "bench_queries": [],
+        "all_citations": [],
+    }
+
+
+@router.post(
+    "/{case_id}/debate/turn",
+    summary="Inject human lawyer argument and trigger dynamic opposing pivot"
+)
+def submit_case_debate_turn(
+    case_id: str,
+    payload: DebateTurnRequest,
+    db: Session = Depends(get_db)
+) -> dict:
+    """
+    Processes human lawyer intervention:
+    1. Injects argument into debate state.
+    2. Opposing agent queries Indian Kanoon to counter the specific argument.
+    3. Emits stream events and updates DB.
+    """
+    case = db.execute(select(Case).where(Case.id == case_id)).scalar_one_or_none()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    mem = db.execute(
+        select(CaseAgentMemory)
+        .where(CaseAgentMemory.case_id == case_id)
+        .where(CaseAgentMemory.memory_key == "active_debate_state")
+    ).scalar_one_or_none()
+
+    state = mem.memory_value if mem else {
+        "case_id": case_id,
+        "matter_title": case.title or "Litigation Matter",
+        "current_round": 2,
+        "debate_turns": [],
+        "bench_queries": [],
+        "all_citations": [],
+        "momentum_petitioner": 55,
+    }
+
+    side = payload.represented_side or "petitioner"
+    opposing_side = "respondent" if side == "petitioner" else "petitioner"
+    custom_arg = payload.custom_argument.strip()
+
+    # Determine dynamic round number based on existing exchanges
+    existing_turns = state.get("debate_turns", [])
+    current_round_num = (len(existing_turns) // 2) + 1
+
+    # User submission turn
+    user_turn = {
+        "id": f"turn_user_{int(datetime.now().timestamp())}",
+        "turn_number": len(existing_turns) + 1,
+        "round_number": current_round_num,
+        "speaker": "user",
+        "speaker_side": side,
+        "title": f"Lead Counsel Intervention ({side.capitalize()})",
+        "argument_text": custom_arg,
+        "citations": [],
+        "doctrine_tags": ["Human Steer", "Custom Doctrine"],
+        "timestamp": datetime.now().strftime("%I:%M %p"),
+    }
+
+    # Autonomous Opponent Kanoon Research
+    citations = autonomous_kanoon_research(custom_arg[:50], opposing_side, max_results=1)
+
+    # Dynamic Opponent LLM Counter-Pivot
+    matter_title = state.get("matter_title", "Litigation Matter")
+    cit_meta = citations[0] if citations else {}
+    pivot_prompt = (
+        f"You are the Senior Advocate representing the {opposing_side.capitalize()} before the High Court of Delhi in '{matter_title}'.\n"
+        f"Human Lead Counsel representing the {side.capitalize()} has just made the following submission:\n"
+        f"\"{custom_arg}\"\n\n"
+        f"Your retrieved legal authority from Indian Kanoon:\n"
+        f"Title: {cit_meta.get('title', 'Supreme Court Precedent')}\n"
+        f"Ratio Decidendi: {cit_meta.get('ratio_decidendi', 'Preliminary inquiries are strictly governed by statutory thresholds.')}\n"
+        f"Statutory Sections: {cit_meta.get('statutory_sections', ['Section 482 CrPC', 'Section 65B Evidence Act'])}\n\n"
+        f"Deliver a direct, highly intelligent, aggressive oral counter-rebuttal (100-150 words). "
+        f"Directly dismantle lead counsel's specific proposition, expose its procedural or factual flaw under Indian law, "
+        f"anchor in {cit_meta.get('title', 'settled Supreme Court precedent')}, and demand that the court rule in your favor."
+    )
+    fallback_counter = (
+        f"Responding directly to lead counsel's submission: The proposition cannot stand. "
+        f"Under {cit_meta.get('title', 'settled Supreme Court authority')}, "
+        "the judicial inquiry at this preliminary threshold is strictly bounded by the four corners of the record. "
+        "Counsel's argument introduces factual disputes that can only be resolved through cross-examination."
+    )
+    counter_arg_text = _call_resilient_llm_text(pivot_prompt, fallback=fallback_counter)
+
+    counter_turn = {
+        "id": f"turn_pivot_{int(datetime.now().timestamp())}",
+        "turn_number": len(existing_turns) + 2,
+        "round_number": current_round_num,
+        "speaker": opposing_side,
+        "speaker_side": opposing_side,
+        "title": f"Autonomous Counter-Rebuttal ({opposing_side.capitalize()})",
+        "argument_text": counter_arg_text,
+        "citations": citations,
+        "doctrine_tags": ["Autonomous Counter-Pivot", "Indian Kanoon Real-Time Grounding"],
+        "timestamp": datetime.now().strftime("%I:%M %p"),
+    }
+
+    turns = list(existing_turns)
+    turns.extend([user_turn, counter_turn])
+    state["debate_turns"] = turns
+    state["current_round"] = current_round_num
+
+    existing_cits = state.get("all_citations", [])
+    for c in citations:
+        if not any(ec.get("doc_id") == c.get("doc_id") for ec in existing_cits):
+            existing_cits.append(c)
+    state["all_citations"] = existing_cits
+
+    state["momentum_petitioner"] = max(30, min(85, state.get("momentum_petitioner", 55) + (4 if side == "petitioner" else -4)))
+
+    # Save to DB
+    if mem:
+        mem.memory_value = state
+        mem.updated_at = datetime.now()
+    else:
+        new_mem = CaseAgentMemory(
+            case_id=case_id,
+            agent_name="trial_debate_orchestrator",
+            memory_key="active_debate_state",
+            memory_value=state,
+        )
+        db.add(new_mem)
+    db.commit()
+
+    # Publish stream event
+    DebateStreamService.publish_event(
+        case_id=case_id,
+        event_type="HUMAN_INTERVENTION_REBUTTAL",
+        speaker=opposing_side,
+        message=f"{opposing_side.capitalize()} counsel delivered immediate counter-rebuttal to human lead counsel.",
+        round_number=current_round_num,
+        details={"user_turn": user_turn, "counter_turn": counter_turn, "round_number": current_round_num},
+    )
+
+    return state
+
+
+@router.get(
+    "/{case_id}/debate/brief",
+    summary="Download or inspect compiled Pre-Trial Combat Pack"
+)
+def get_case_debate_brief(
+    case_id: str,
+    db: Session = Depends(get_db)
+) -> dict:
+    """Returns compiled pre-trial brief from DB."""
+    mem = db.execute(
+        select(CaseAgentMemory)
+        .where(CaseAgentMemory.case_id == case_id)
+        .where(CaseAgentMemory.memory_key == "trial_debate_brief")
+    ).scalar_one_or_none()
+
+    if mem:
+        return mem.memory_value
+
+    return {
+        "case_id": case_id,
+        "executive_summary": "Simulation in progress. Complete all 3 rounds to generate final brief.",
+        "adversary_playbook": [],
+        "citations_ledger": [],
+    }
+
+
+@router.get(
+    "/{case_id}/debate/stream",
+    summary="Real-time Server-Sent Events stream for courtroom debate"
+)
+async def stream_case_debate_events(case_id: str):
+    """Streams live courtroom speech events, Kanoon search calls, and bench queries."""
+    async def event_generator():
+        async for event in DebateStreamService.subscribe_events(case_id, timeout=180):
+            yield f"data: {json.dumps(event)}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Content-Type": "text/event-stream",
+        },
+    )

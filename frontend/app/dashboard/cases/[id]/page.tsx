@@ -15,6 +15,8 @@ import {
   RefreshCw,
   FolderKanban,
   ExternalLink,
+  Gavel,
+  Scale,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { apiClient } from "@/services/api";
@@ -223,9 +225,19 @@ export default function CaseWorkspacePage() {
             Refresh
           </Button>
 
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => router.push(`/dashboard/cases/${caseId}/debate`)}
+            className="text-xs font-semibold gap-1.5 bg-[#2563EB] hover:bg-blue-700 text-white"
+          >
+            <Gavel className="w-3.5 h-3.5" />
+            <span>Pre-Trial War Room</span>
+          </Button>
+
           {caseDetail.has_analysis || caseDetail.status === "analyzed" ? (
             <Button
-              variant="default"
+              variant="outline"
               size="sm"
               onClick={() => router.push(`/dashboard/cases/${caseId}/results`)}
               className="text-xs font-semibold"
@@ -234,7 +246,7 @@ export default function CaseWorkspacePage() {
             </Button>
           ) : (
             <Button
-              variant="default"
+              variant="outline"
               size="sm"
               onClick={handleTriggerAnalysis}
               loading={triggering || caseDetail.status === "processing"}
@@ -358,9 +370,31 @@ export default function CaseWorkspacePage() {
                 </div>
               </div>
 
-              {caseDetail.has_analysis && (
+              <div className="p-3 rounded-md border border-blue-200 bg-blue-50/50 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-1.5 font-semibold text-blue-950">
+                    <Scale className="w-3.5 h-3.5 text-[#2563EB]" />
+                    <span>Courtroom Debate Simulation</span>
+                  </div>
+                  <Badge variant="info" className="text-[10px]">Active</Badge>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-snug">
+                  Multi-agent oral arguments, judicial bench challenges, and real-time Indian Kanoon research.
+                </p>
                 <Button
                   variant="default"
+                  size="sm"
+                  onClick={() => router.push(`/dashboard/cases/${caseId}/debate`)}
+                  className="w-full text-xs font-semibold gap-1.5 bg-[#2563EB] hover:bg-blue-700 text-white"
+                >
+                  <Gavel className="w-3.5 h-3.5" />
+                  <span>Enter Pre-Trial War Room</span>
+                </Button>
+              </div>
+
+              {caseDetail.has_analysis && (
+                <Button
+                  variant="outline"
                   size="sm"
                   onClick={() => router.push(`/dashboard/cases/${caseId}/results`)}
                   className="w-full text-xs mt-2"

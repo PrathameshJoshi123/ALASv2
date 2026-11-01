@@ -160,6 +160,15 @@ export default function CaseResultsPage() {
           >
             Export Dossier
           </Button>
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => router.push(`/dashboard/cases/${caseId}/debate`)}
+            className="text-xs gap-1.5"
+          >
+            <Gavel className="w-3.5 h-3.5" />
+            <span>Pre-Trial War Room</span>
+          </Button>
         </div>
       </div>
 

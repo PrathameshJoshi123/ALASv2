@@ -400,7 +400,32 @@ class APIClient {
     const response = await this.client.get(`/api/v1/cases/${caseId}/logs`);
     return response.data;
   }
+
+  // Pre-Trial Adversarial Debate Endpoints
+  async startCaseDebate(caseId: string, options?: { mode?: string; represented_side?: string }) {
+    const response = await this.client.post(`/api/v1/cases/${caseId}/debate/start`, options || {});
+    return response.data;
+  }
+
+  async getCaseDebateStatus(caseId: string) {
+    const response = await this.client.get(`/api/v1/cases/${caseId}/debate/status`);
+    return response.data;
+  }
+
+  async submitDebateArgument(caseId: string, payload: { custom_argument: string; represented_side?: string }) {
+    const response = await this.client.post(`/api/v1/cases/${caseId}/debate/turn`, payload);
+    return response.data;
+  }
+
+  async getDebateBrief(caseId: string) {
+    const response = await this.client.get(`/api/v1/cases/${caseId}/debate/brief`);
+    return response.data;
+  }
+
+  getDebateStreamUrl(caseId: string): string {
+    const base = this.client.defaults.baseURL || "http://localhost:8000";
+    return `${base}/api/v1/cases/${caseId}/debate/stream`;
+  }
 }
 
 export const apiClient = new APIClient();
-
