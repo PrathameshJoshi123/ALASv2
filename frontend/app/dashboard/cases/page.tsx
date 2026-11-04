@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Markdown } from "@/components/ui/markdown";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
@@ -215,7 +216,7 @@ export default function CasesPage() {
                   {getStatusBadge(c.status, c.has_analysis)}
                 </div>
                 <CardDescription className="text-xs line-clamp-2 mt-2 leading-relaxed">
-                  {c.description || "Litigation matter records under examination."}
+                  <Markdown content={c.description || "Litigation matter records under examination."} inline />
                 </CardDescription>
               </CardHeader>
 

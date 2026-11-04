@@ -188,6 +188,19 @@ def safe_parse_json(content: str) -> Any:
     def _clean_trailing_commas(s: str) -> str:
         return re.sub(r',\s*([\]\}])', r'\1', s)
 
+    def _strip_markdown_bold(s: str) -> str:
+        # Remove LLM hallucinated markdown bold markers inside JSON tokens
+        return s.replace("**", "")
+
+    def _clean_trailing_annotations(s: str) -> str:
+        lines = s.splitlines()
+        repaired = []
+        for line in lines:
+            # Strip trailing annotations like (Clause 12). outside quotes
+            line = re.sub(r'(:\s*"[^"]*")\s*\([^)]*\)\.?', r'\1', line)
+            repaired.append(line)
+        return "\n".join(repaired)
+
     def _fix_inner_quotes(s: str) -> str:
         lines = s.splitlines()
         repaired = []
@@ -203,8 +216,11 @@ def safe_parse_json(content: str) -> Any:
 
     # Step 1: Apply structural text repairs while newlines are preserved
     s1 = _strip_comments(cleaned)
+    s1 = _strip_markdown_bold(s1)
+    s1 = _clean_trailing_annotations(s1)
     s1 = _fix_single_quotes(s1)
     s1 = _quote_unquoted_keys(s1)
+    s1 = _fix_inner_quotes(s1)
     s1 = _clean_trailing_commas(s1)
     s1 = _clean_invalid_escapes(s1)
 

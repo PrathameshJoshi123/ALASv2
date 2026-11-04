@@ -38,6 +38,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Markdown } from "@/components/ui/markdown";
 
 interface TimelineItem {
   id?: string;
@@ -418,8 +419,11 @@ export default function CaseResultsPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-xs sm:text-sm text-foreground leading-relaxed whitespace-pre-wrap font-sans bg-muted/20 p-4 rounded-md border border-border">
-                {executiveSummary}
+              <div className="bg-muted/20 p-4 rounded-md border border-border">
+                <Markdown
+                  content={executiveSummary}
+                  className="text-xs sm:text-sm text-foreground leading-relaxed font-sans"
+                />
               </div>
             </CardContent>
           </Card>
@@ -441,7 +445,7 @@ export default function CaseResultsPage() {
                   keyFindings.map((pt, idx) => (
                     <div key={idx} className="flex items-start gap-2.5 text-xs text-foreground bg-muted/30 p-2.5 rounded border border-border/60">
                       <span className="text-[#2563EB] font-bold mt-0.5">•</span>
-                      <span className="leading-relaxed">{pt}</span>
+                      <Markdown content={pt} className="leading-relaxed flex-1 text-xs" />
                     </div>
                   ))
                 ) : (
@@ -465,7 +469,7 @@ export default function CaseResultsPage() {
                   recommendedActions.map((act, idx) => (
                     <div key={idx} className="flex items-start gap-2.5 text-xs text-foreground bg-emerald-50/40 p-2.5 rounded border border-emerald-200/60">
                       <span className="text-emerald-700 font-bold mt-0.5">✓</span>
-                      <span className="leading-relaxed">{act}</span>
+                      <Markdown content={act} className="leading-relaxed flex-1 text-xs" />
                     </div>
                   ))
                 ) : (
@@ -515,7 +519,7 @@ export default function CaseResultsPage() {
                           {doc.execution_or_filing_date || "Date Unspecified"}
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground py-3 max-w-[340px]">
-                          <p className="truncate">{doc.rationale || doc.citation_quote || "Identified from document header."}</p>
+                          <Markdown content={doc.rationale || doc.citation_quote || "Identified from document header."} inline className="truncate" />
                         </TableCell>
                       </TableRow>
                     ))}
@@ -574,18 +578,17 @@ export default function CaseResultsPage() {
                       )}
                     </CardHeader>
                     <CardContent className="p-4 pt-1 space-y-2">
-                      <p className="text-xs font-medium text-foreground leading-relaxed">
-                        {item.event_description}
-                      </p>
+                      <Markdown content={item.event_description} className="text-xs font-medium text-foreground leading-relaxed" />
                       {item.delay_details && (
-                        <p className="text-xs text-red-700 bg-red-50 p-2 rounded border border-red-200">
-                          <strong>Delay Analysis:</strong> {item.delay_details}
-                        </p>
+                        <div className="text-xs text-red-700 bg-red-50 p-2 rounded border border-red-200 space-y-1">
+                          <strong className="block text-red-900">Delay Analysis:</strong>
+                          <Markdown content={item.delay_details} className="text-xs text-red-700" />
+                        </div>
                       )}
                       {item.citation_quote && (
-                        <blockquote className="text-xs font-mono bg-muted/40 p-2.5 rounded border border-border text-slate-700 italic">
-                          "{item.citation_quote}"
-                        </blockquote>
+                        <div className="text-xs font-mono bg-muted/40 p-2.5 rounded border border-border text-slate-700 italic">
+                          <Markdown content={item.citation_quote} className="text-xs font-mono" />
+                        </div>
                       )}
                     </CardContent>
                   </Card>
@@ -634,18 +637,16 @@ export default function CaseResultsPage() {
                     </p>
                   </CardHeader>
                   <CardContent className="p-4 pt-1 space-y-3">
-                    <p className="text-xs text-foreground leading-relaxed">
-                      {wc.description}
-                    </p>
+                    <Markdown content={wc.description} className="text-xs text-foreground leading-relaxed" />
 
                     {wc.citation_quote && (
                       <div className="space-y-1">
                         <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
                           Verified Citation ({wc.source_document_name || "Exhibit"} {wc.source_page ? `Page ${wc.source_page}` : ""}):
                         </p>
-                        <blockquote className="text-[11px] font-mono bg-muted/40 p-2 rounded border border-border text-slate-800 italic">
-                          "{wc.citation_quote}"
-                        </blockquote>
+                        <div className="text-[11px] font-mono bg-muted/40 p-2 rounded border border-border text-slate-800 italic">
+                          <Markdown content={wc.citation_quote} className="text-[11px] font-mono" />
+                        </div>
                       </div>
                     )}
 
@@ -655,9 +656,7 @@ export default function CaseResultsPage() {
                           <Gavel className="w-3 h-3 text-[#2563EB]" />
                           <span>Cross-Examination Tactical Line (Sec 145/146 Evidence Act / BSA):</span>
                         </p>
-                        <p className="text-[11px] text-blue-950 leading-relaxed">
-                          {wc.cross_examination_angle}
-                        </p>
+                        <Markdown content={wc.cross_examination_angle} className="text-[11px] text-blue-950 leading-relaxed" />
                       </div>
                     )}
                   </CardContent>
@@ -731,14 +730,16 @@ export default function CaseResultsPage() {
                                 return (
                                   <TableRow key={iIdx}>
                                     <TableCell className="text-xs font-medium text-foreground py-2.5">
-                                      {ing.ingredient}
+                                      <Markdown content={ing.ingredient} inline />
                                     </TableCell>
                                     <TableCell className="text-xs py-2.5">
                                       <div className="flex items-center gap-1.5">
                                         <span className={`w-2 h-2 rounded-full ${isSupported ? 'bg-emerald-500' : 'bg-red-500'}`} />
-                                        <span className={isSupported ? 'text-emerald-800' : 'text-red-700 font-medium'}>
-                                          {ing.evidentiary_support}
-                                        </span>
+                                        <Markdown
+                                          content={ing.evidentiary_support}
+                                          inline
+                                          className={isSupported ? 'text-emerald-800' : 'text-red-700 font-medium'}
+                                        />
                                       </div>
                                     </TableCell>
                                     <TableCell className="text-xs text-muted-foreground font-mono py-2.5">
@@ -760,9 +761,7 @@ export default function CaseResultsPage() {
                           <p className="font-bold text-red-900 text-[10px] uppercase tracking-wider">
                             Prosecution Flaws & Missing Proof:
                           </p>
-                          <p className="text-red-950 leading-relaxed">
-                            {ch.defense_vulnerabilities}
-                          </p>
+                          <Markdown content={ch.defense_vulnerabilities} className="text-red-950 leading-relaxed text-xs" />
                         </div>
                       )}
                       {ch.defense_strategy && (
@@ -770,9 +769,7 @@ export default function CaseResultsPage() {
                           <p className="font-bold text-emerald-900 text-[10px] uppercase tracking-wider">
                             Defense Legal Counter-Theory:
                           </p>
-                          <p className="text-emerald-950 leading-relaxed">
-                            {ch.defense_strategy}
-                          </p>
+                          <Markdown content={ch.defense_strategy} className="text-emerald-950 leading-relaxed text-xs" />
                         </div>
                       )}
                     </div>
@@ -819,9 +816,7 @@ export default function CaseResultsPage() {
                   <CardContent className="p-4 pt-1 space-y-3">
                     <div className="space-y-1">
                       <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Legal Justification:</p>
-                      <p className="text-xs text-foreground leading-relaxed">
-                        {me.legal_relevance}
-                      </p>
+                      <Markdown content={me.legal_relevance} className="text-xs text-foreground leading-relaxed" />
                     </div>
 
                     {me.recommendation && (
@@ -829,9 +824,7 @@ export default function CaseResultsPage() {
                         <p className="text-[10px] font-bold text-slate-800 uppercase tracking-wider">
                           Strategic Counsel Recommendation:
                         </p>
-                        <p className="text-slate-700 leading-relaxed">
-                          {me.recommendation}
-                        </p>
+                        <Markdown content={me.recommendation} className="text-slate-700 leading-relaxed text-xs" />
                       </div>
                     )}
                   </CardContent>
@@ -870,16 +863,17 @@ export default function CaseResultsPage() {
                           {pc.procedural_stage || "Stage"}
                         </Badge>
                         <span className="text-xs font-bold text-foreground">
-                          {pc.requirement}
+                          <Markdown content={pc.requirement} inline />
                         </span>
                       </div>
                       <p className="text-xs text-muted-foreground">
                         Statutory Deadline / Period: <strong className="text-slate-800 font-mono">{pc.statutory_deadline || "Not specified"}</strong>
                       </p>
                       {pc.remedy && (
-                        <p className="text-xs text-blue-900 bg-blue-50/50 p-2 rounded border border-blue-200">
-                          <strong>Remedy / Application:</strong> {pc.remedy}
-                        </p>
+                        <div className="text-xs text-blue-900 bg-blue-50/50 p-2 rounded border border-blue-200 space-y-1">
+                          <strong className="block text-blue-950">Remedy / Application:</strong>
+                          <Markdown content={pc.remedy} className="text-xs text-blue-900" />
+                        </div>
                       )}
                     </div>
                     <div className="shrink-0">
@@ -948,9 +942,7 @@ export default function CaseResultsPage() {
                       <p className="text-[10px] font-bold text-blue-900 uppercase tracking-wider">
                         Binding Ratio Decidendi:
                       </p>
-                      <p className="text-blue-950 leading-relaxed">
-                        {prec.ratio_decidendi}
-                      </p>
+                      <Markdown content={prec.ratio_decidendi} className="text-blue-950 leading-relaxed text-xs" />
                     </div>
 
                     {/* Statutory Sections */}
@@ -970,9 +962,7 @@ export default function CaseResultsPage() {
                       <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                         Relevance to Current Matter:
                       </p>
-                      <p className="text-foreground leading-relaxed">
-                        {prec.relevance}
-                      </p>
+                      <Markdown content={prec.relevance} className="text-foreground leading-relaxed text-xs" />
                     </div>
 
                     {/* Application Strategy */}
@@ -981,9 +971,7 @@ export default function CaseResultsPage() {
                         <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">
                           Tactical Deployment in Argument:
                         </p>
-                        <p className="text-slate-700 leading-relaxed">
-                          {prec.application_strategy}
-                        </p>
+                        <Markdown content={prec.application_strategy} className="text-slate-700 leading-relaxed text-xs" />
                       </div>
                     )}
                   </CardContent>
@@ -1084,8 +1072,8 @@ export default function CaseResultsPage() {
                         <span className="text-[#2563EB] font-bold">Q:</span>
                         <span>{qa.question}</span>
                       </p>
-                      <div className="text-xs text-muted-foreground leading-relaxed pl-4 border-l-2 border-border whitespace-pre-wrap">
-                        {qa.answer}
+                      <div className="text-xs text-foreground/90 leading-relaxed pl-4 border-l-2 border-border">
+                        <Markdown content={qa.answer} className="text-xs text-foreground/90" />
                       </div>
                       {qa.citations && qa.citations.length > 0 && (
                         <div className="pl-4 pt-1 flex flex-wrap gap-1.5">

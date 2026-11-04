@@ -50,31 +50,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-
-function LegalMarkdown({ content, className }: { content: string; className?: string }) {
-  if (!content) return null;
-  return (
-    <div
-      className={cn(
-        "prose prose-xs max-w-none text-xs leading-relaxed text-foreground/90",
-        "[&_p]:mb-2 [&_p:last-child]:mb-0",
-        "[&_strong]:font-semibold [&_strong]:text-foreground",
-        "[&_em]:italic",
-        "[&_ul]:list-disc [&_ul]:pl-4 [&_ul]:my-1.5",
-        "[&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:my-1.5",
-        "[&_li]:my-0.5",
-        "[&_blockquote]:border-l-2 [&_blockquote]:border-primary/40 [&_blockquote]:pl-2.5 [&_blockquote]:italic",
-        className,
-      )}
-    >
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>
-        {content}
-      </ReactMarkdown>
-    </div>
-  );
-}
+import { Markdown, LegalMarkdown } from "@/components/ui/markdown";
 
 // ============================================================
 // Types
@@ -855,7 +831,7 @@ export default function PreTrialDebatePage() {
                         </span>
                       </div>
                       <CardTitle className="text-sm font-semibold mt-1.5 text-foreground leading-snug">
-                        {rnd.petitioner_submission.title.replace(/\*\*/g, "").replace(/\*/g, "")}
+                        <Markdown content={rnd.petitioner_submission.title} inline />
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="p-4 pt-1 space-y-3">
@@ -882,9 +858,10 @@ export default function PreTrialDebatePage() {
                                 <div className="text-[11px] text-blue-700/80 mt-0.5">
                                   {c.court} &bull; {c.citation_standard}
                                 </div>
-                                <p className="text-[11px] text-muted-foreground line-clamp-1 mt-1">
-                                  Ratio: {c.ratio_decidendi}
-                                </p>
+                                <div className="text-[11px] text-muted-foreground line-clamp-1 mt-1 flex items-baseline gap-1">
+                                  <span>Ratio:</span>
+                                  <Markdown content={c.ratio_decidendi} inline />
+                                </div>
                               </button>
                             ))}
                           </div>
@@ -928,7 +905,8 @@ export default function PreTrialDebatePage() {
                     />
                     {q.evidentiary_flag && (
                       <div className="text-[10px] text-amber-800 bg-amber-50 p-1.5 rounded border border-amber-200 font-medium">
-                        ⚠️ Audit: {q.evidentiary_flag}
+                        <span className="font-bold mr-1">⚠️ Audit:</span>
+                        <Markdown content={q.evidentiary_flag} inline />
                       </div>
                     )}
                     <div className="pt-1 text-[11px] text-muted-foreground border-t border-border space-y-0.5">
@@ -976,7 +954,7 @@ export default function PreTrialDebatePage() {
                         </span>
                       </div>
                       <CardTitle className="text-sm font-semibold mt-1.5 text-foreground leading-snug">
-                        {rnd.respondent_submission.title.replace(/\*\*/g, "").replace(/\*/g, "")}
+                        <Markdown content={rnd.respondent_submission.title} inline />
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="p-4 pt-1 space-y-3">
@@ -1003,9 +981,10 @@ export default function PreTrialDebatePage() {
                                 <div className="text-[11px] text-slate-600 mt-0.5">
                                   {c.court} &bull; {c.citation_standard}
                                 </div>
-                                <p className="text-[11px] text-muted-foreground line-clamp-1 mt-1">
-                                  Ratio: {c.ratio_decidendi}
-                                </p>
+                                <div className="text-[11px] text-muted-foreground line-clamp-1 mt-1 flex items-baseline gap-1">
+                                  <span>Ratio:</span>
+                                  <Markdown content={c.ratio_decidendi} inline />
+                                </div>
                               </button>
                             ))}
                           </div>
@@ -1192,14 +1171,14 @@ export default function PreTrialDebatePage() {
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="p-4 pt-1 space-y-2">
-                      <div className="text-xs">
+                      <div className="text-xs space-y-1">
                         <span className="font-semibold text-foreground">Ratio Decidendi: </span>
-                        <span className="text-muted-foreground">{cit.ratio_decidendi}</span>
+                        <Markdown content={cit.ratio_decidendi} className="text-muted-foreground" />
                       </div>
                       {cit.distinguishing_angle && (
-                        <div className="p-2 rounded bg-amber-50 border border-amber-200 text-[11px] text-amber-900">
-                          <span className="font-semibold">Counter / Distinguishing Note: </span>
-                          {cit.distinguishing_angle}
+                        <div className="p-2 rounded bg-amber-50 border border-amber-200 text-[11px] text-amber-900 space-y-1">
+                          <span className="font-semibold block">Counter / Distinguishing Note: </span>
+                          <Markdown content={cit.distinguishing_angle} className="text-[11px]" />
                         </div>
                       )}
                     </CardContent>
@@ -1237,9 +1216,7 @@ export default function PreTrialDebatePage() {
               <div className="space-y-4 py-2 text-xs">
                 <div className="p-3 rounded-lg border border-border bg-slate-50 space-y-1">
                   <p className="font-semibold text-foreground">Ratio Decidendi (Core Legal Rule):</p>
-                  <p className="text-muted-foreground leading-relaxed">
-                    {inspectCitation.ratio_decidendi}
-                  </p>
+                  <Markdown content={inspectCitation.ratio_decidendi} className="text-muted-foreground leading-relaxed" />
                 </div>
 
                 <div className="space-y-1">
@@ -1255,10 +1232,13 @@ export default function PreTrialDebatePage() {
 
                 <div className="p-3 rounded-lg border border-amber-200 bg-amber-50 space-y-1 text-amber-900">
                   <p className="font-semibold">How to Distinguish This in Court (Trial Hack):</p>
-                  <p className="leading-relaxed">
-                    {inspectCitation.distinguishing_angle ||
-                      "Focus on distinct factual matrix or establish non-applicability to criminal proceedings."}
-                  </p>
+                  <Markdown
+                    content={
+                      inspectCitation.distinguishing_angle ||
+                      "Focus on distinct factual matrix or establish non-applicability to criminal proceedings."
+                    }
+                    className="leading-relaxed"
+                  />
                 </div>
 
                 <div className="flex items-center justify-between pt-3 border-t border-border">
@@ -1342,11 +1322,11 @@ export default function PreTrialDebatePage() {
                     counter_rebuttal: "File application under Section 91 CrPC directing production of the original mobile device for forensic inspection.",
                   },
                 ]).map((item: any, i: number) => (
-                  <div key={i} className="p-3 rounded border border-border bg-card">
+                  <div key={i} className="p-3 rounded border border-border bg-card space-y-1">
                     <p className="font-semibold text-foreground">Predicted Move #{i + 1}:</p>
-                    <p className="text-muted-foreground">{item.predicted_move}</p>
+                    <Markdown content={item.predicted_move} className="text-muted-foreground" />
                     <p className="font-semibold text-emerald-800 mt-1">Recommended Rebuttal:</p>
-                    <p className="text-emerald-700">{item.counter_rebuttal}</p>
+                    <Markdown content={item.counter_rebuttal} className="text-emerald-700" />
                   </div>
                 ))}
               </div>

@@ -32,6 +32,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Markdown, formatLegalMarkdown } from "@/components/ui/markdown";
 
 interface Clause {
   id: string;
@@ -42,6 +43,10 @@ interface Clause {
   risk_description: string;
   legal_reasoning: string;
   confidence_score: number;
+  original_raw_text?: string;
+  is_revised?: boolean;
+  revision_rationale?: string;
+  revised_at?: string;
 }
 
 /**
@@ -221,6 +226,23 @@ export default function AnalysisDetailPage() {
     "";
   const formattedDocumentText = useMemo(() => formatOcrDocumentText(rawText), [rawText]);
 
+  const rawRiskScore = Number(analysis?.overall_risk_score ?? contract?.overall_risk_score ?? 0);
+  const criticalCount = Number(analysis?.critical_issues ?? contract?.critical_issues ?? 0);
+  const highCount = Number(analysis?.high_issues ?? contract?.high_issues ?? 0);
+  const medCount = Number(analysis?.medium_issues ?? contract?.medium_issues ?? 0);
+  const lowCount = Number(analysis?.low_issues ?? contract?.low_issues ?? 0);
+  const totalAudited = Math.max(1, clauses.length);
+
+  // Self-heal risk score if legacy additive formula capped it at 100% when 0 critical issues exist
+  const riskScore = useMemo(() => {
+    if (rawRiskScore >= 99 && criticalCount === 0 && (highCount > 0 || medCount > 0)) {
+      const weightedSum = criticalCount * 20 + highCount * 10 + medCount * 4 + lowCount * 0.5;
+      const proportional = (weightedSum / Math.pow(totalAudited, 0.6)) * 3.8;
+      return Math.round(Math.max(5, Math.min(95, proportional)));
+    }
+    return Math.round(rawRiskScore);
+  }, [rawRiskScore, criticalCount, highCount, medCount, lowCount, totalAudited]);
+
   if (loading) {
     return (
       <div className="p-16 flex flex-col items-center justify-center text-xs text-muted-foreground gap-3 min-h-[50vh]">
@@ -230,7 +252,6 @@ export default function AnalysisDetailPage() {
     );
   }
 
-  const riskScore = Number(analysis?.overall_risk_score || contract?.overall_risk_score || 0);
   const legalSources = analysis?.legal_sources || [];
   const unresolvedQuestions = analysis?.unresolved_questions || [];
 
@@ -393,9 +414,10 @@ export default function AnalysisDetailPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap font-sans">
-                {analysis?.analysis_summary || analysis?.summary || "Contract analysis completed."}
-              </p>
+              <Markdown
+                content={analysis?.analysis_summary || analysis?.summary || "Contract analysis completed."}
+                className="text-xs text-foreground leading-relaxed font-sans"
+              />
             </CardContent>
           </Card>
 
@@ -413,7 +435,7 @@ export default function AnalysisDetailPage() {
                   analysis.key_findings.map((item: string, idx: number) => (
                     <div key={idx} className="flex items-start gap-2.5 text-xs text-foreground">
                       <span className="text-blue-600 font-bold mt-0.5 shrink-0">•</span>
-                      <span className="leading-relaxed">{item}</span>
+                      <Markdown content={item} className="leading-relaxed flex-1 text-xs" />
                     </div>
                   ))
                 ) : (
@@ -434,7 +456,7 @@ export default function AnalysisDetailPage() {
                   analysis.recommended_actions.map((item: string, idx: number) => (
                     <div key={idx} className="flex items-start gap-2.5 text-xs text-foreground">
                       <span className="text-emerald-600 font-bold mt-0.5 shrink-0">✓</span>
-                      <span className="leading-relaxed">{item}</span>
+                      <Markdown content={item} className="leading-relaxed flex-1 text-xs" />
                     </div>
                   ))
                 ) : (
@@ -508,16 +530,16 @@ export default function AnalysisDetailPage() {
                       </div>
 
                       {source.relevance_summary && (
-                        <p className="text-[11px] text-slate-700 leading-relaxed bg-white p-2.5 rounded-lg border border-border">
-                          <strong className="font-semibold text-slate-800">Relevance:</strong>{" "}
-                          {source.relevance_summary}
-                        </p>
+                        <div className="text-[11px] text-slate-700 leading-relaxed bg-white p-2.5 rounded-lg border border-border">
+                          <strong className="font-semibold text-slate-800 mr-1">Relevance:</strong>
+                          <Markdown content={source.relevance_summary} inline className="text-[11px]" />
+                        </div>
                       )}
 
                       {source.key_provision_or_ratio && (
-                        <p className="text-[11px] text-purple-900 bg-purple-50 p-2 rounded border border-purple-200/80 font-mono line-clamp-3">
-                          {source.key_provision_or_ratio}
-                        </p>
+                        <div className="text-[11px] text-purple-900 bg-purple-50 p-2 rounded border border-purple-200/80 font-mono">
+                          <Markdown content={source.key_provision_or_ratio} className="text-[11px] font-mono" />
+                        </div>
                       )}
                     </div>
                   ))}
@@ -599,17 +621,52 @@ export default function AnalysisDetailPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="p-4 pt-2 space-y-2.5">
-                  <div className="p-3 bg-muted/40 rounded-md text-xs font-mono text-slate-800 leading-relaxed border border-border/60">
-                    {clause.raw_text}
+                  <div className="p-3.5 bg-slate-50/80 rounded-md text-xs text-slate-800 leading-relaxed border border-border/60 font-sans shadow-2xs">
+                    <Markdown content={clause.raw_text} className="text-xs text-slate-800 leading-relaxed font-sans" />
                   </div>
-                  {clause.risk_description && (
-                    <div className="text-xs text-red-700 bg-red-50/70 p-2.5 rounded border border-red-200/70 leading-relaxed">
-                      <strong>Risk Identified:</strong> {clause.risk_description}
+
+                  {clause.original_raw_text && clause.original_raw_text !== clause.raw_text && (
+                    <details className="text-[11px] text-muted-foreground bg-muted/20 rounded p-2 border border-border/40">
+                      <summary className="cursor-pointer font-medium hover:text-foreground select-none flex items-center gap-1.5">
+                        <span>Original Clause Text (Pre-Redraft)</span>
+                      </summary>
+                      <div className="mt-2 pt-2 border-t border-border/40 font-mono text-[11px] whitespace-pre-wrap text-slate-600 bg-white/60 p-2 rounded">
+                        {clause.original_raw_text}
+                      </div>
+                    </details>
+                  )}
+
+                  {clause.revision_rationale && (
+                    <div className="text-xs text-emerald-800 bg-emerald-50/60 p-2.5 rounded border border-emerald-200/60 leading-relaxed">
+                      <strong className="block mb-1 text-emerald-900 flex items-center gap-1">
+                        <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                        Redraft Legal Rationale:
+                      </strong>
+                      <Markdown content={clause.revision_rationale} className="text-xs text-emerald-800" />
                     </div>
                   )}
+
+                  {clause.risk_description && (
+                    clause.severity?.toUpperCase() === "REVISED_SAFE" ? (
+                      <div className="text-xs text-emerald-800 bg-emerald-50/50 p-2.5 rounded border border-emerald-200/50 leading-relaxed">
+                        <strong className="block mb-1 text-emerald-900 flex items-center gap-1">
+                          <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                          Remedied Vulnerability:
+                        </strong>
+                        <Markdown content={clause.risk_description} className="text-xs text-emerald-800" />
+                      </div>
+                    ) : (
+                      <div className="text-xs text-red-700 bg-red-50/70 p-2.5 rounded border border-red-200/70 leading-relaxed">
+                        <strong className="block mb-1 text-red-800">Risk Identified:</strong>
+                        <Markdown content={clause.risk_description} className="text-xs text-red-700" />
+                      </div>
+                    )
+                  )}
+
                   {clause.legal_reasoning && (
                     <div className="text-xs text-slate-700 p-2.5 bg-slate-50 rounded border border-border leading-relaxed">
-                      <strong>Legal Analysis:</strong> {clause.legal_reasoning}
+                      <strong className="block mb-1 text-slate-800">Legal Analysis:</strong>
+                      <Markdown content={clause.legal_reasoning} className="text-xs text-slate-700" />
                     </div>
                   )}
                 </CardContent>
@@ -691,9 +748,10 @@ export default function AnalysisDetailPage() {
                               </span>
                             )}
                           </div>
-                          <p className="text-xs text-slate-800 leading-relaxed font-medium">
-                            {text}
-                          </p>
+                          <Markdown
+                            content={text}
+                            className="text-xs text-slate-800 leading-relaxed font-medium"
+                          />
                         </div>
                       </CardContent>
                     </Card>
@@ -772,12 +830,14 @@ export default function AnalysisDetailPage() {
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-slate-800 font-medium leading-relaxed">
-                          {text}
-                        </p>
+                        <Markdown
+                          content={text}
+                          className="text-xs text-slate-800 font-medium leading-relaxed"
+                        />
                         {mitigation && (
                           <div className="text-xs text-emerald-800 bg-emerald-50/70 p-2.5 rounded border border-emerald-200/70 leading-relaxed">
-                            <strong>Recommended Mitigation:</strong> {mitigation}
+                            <strong className="block mb-1 text-emerald-900">Recommended Mitigation:</strong>
+                            <Markdown content={mitigation} className="text-xs text-emerald-800" />
                           </div>
                         )}
                       </CardContent>
@@ -827,9 +887,10 @@ export default function AnalysisDetailPage() {
                           )}
                         </button>
                         <div className="flex-1 space-y-0.5">
-                          <p className="text-xs font-medium text-slate-800 leading-relaxed">
-                            {q}
-                          </p>
+                          <Markdown
+                            content={q}
+                            className="text-xs font-medium text-slate-800 leading-relaxed"
+                          />
                           <p className="text-[10px] text-amber-700">
                             {isChecked
                               ? "Marked as clarified/reviewed"

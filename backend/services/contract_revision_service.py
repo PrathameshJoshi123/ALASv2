@@ -347,7 +347,16 @@ def apply_clause_revision_to_db(
             analysis.high_issues = high
             analysis.medium_issues = med
             analysis.low_issues = low
-            analysis.overall_risk_score = min(100.0, float(crit * 30 + high * 20 + med * 10 + low * 5))
+
+            # Proportional legal risk calculation normalized across total clause density
+            total_clauses = max(1, len(existing_clauses))
+            if crit == 0 and high == 0 and med == 0 and low == 0:
+                analysis.overall_risk_score = 0.0
+            else:
+                weighted_sum = (crit * 20.0 + high * 10.0 + med * 4.0 + low * 0.5)
+                proportional_score = (weighted_sum / (total_clauses ** 0.6)) * 3.8
+                analysis.overall_risk_score = round(max(5.0, min(95.0, proportional_score)), 1)
+
             analysis.updated_at = datetime.utcnow()
 
             db.commit()

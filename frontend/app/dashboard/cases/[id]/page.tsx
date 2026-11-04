@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Markdown } from "@/components/ui/markdown";
 
 interface CaseDocumentItem {
   id: string;
@@ -209,9 +210,9 @@ export default function CaseWorkspacePage() {
               {caseDetail.documents?.length || 0} Exhibits
             </Badge>
           </div>
-          <p className="text-sm text-muted-foreground mt-1 max-w-3xl">
-            {caseDetail.description || "Litigation matter records under examination."}
-          </p>
+          <div className="text-sm text-muted-foreground mt-1 max-w-3xl">
+            <Markdown content={caseDetail.description || "Litigation matter records under examination."} inline />
+          </div>
         </div>
 
         <div className="flex items-center gap-3">

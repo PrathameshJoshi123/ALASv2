@@ -1,0 +1,29 @@
+[
+  {
+    "id": "draft_redline_01",
+    "statute_type": "SECTION_27_NON_COMPETE",
+    "defect_name": "Void Post-Employment Restraint of Trade",
+    "original_clause": "For a period of thirty-six (36) months following the termination of this Agreement for any reason whatsoever, the Service Provider shall not, directly or indirectly, solicit, engage in, consult for, or establish any commercial software business competing with the Client anywhere within India.",
+    "statutory_violation": "Section 27 of the Indian Contract Act, 1872 renders all covenants restraining lawful trade or profession post-termination void ab initio (Niranjan Shankar Golikari, Percept D'Mark).",
+    "required_remedy": "Confine restrictive covenant strictly to the active term of the agreement and convert post-term protection to robust non-disclosure and intellectual property protections.",
+    "sample_valid_redline": "During the active term of this Agreement, the Service Provider shall not directly engage in any commercial activity in direct competition with the specific deliverables developed hereunder. Following termination, the Service Provider shall remain bound by strict non-disclosure obligations under Section 7 and shall not misuse proprietary trade secrets, without imposing any unlawful restraint on lawful profession under Section 27 of the Indian Contract Act, 1872."
+  },
+  {
+    "id": "draft_redline_02",
+    "statute_type": "SECTION_74_LIQUIDATED_DAMAGES",
+    "defect_name": "Unenforceable Punitive Penalty Clause",
+    "original_clause": "In the event of any delayed delivery by Vendor exceeding five (5) days, Customer shall be entitled to forfeit 100% of the entire contract value as a punitive penalty and demand immediate payment of an additional liquidated sum of INR 50,00,000 without requiring any proof of actual loss or damages suffered.",
+    "statutory_violation": "Section 74 of the Indian Contract Act, 1872 and Supreme Court ruling in Kailash Nath Associates v. DDA prohibit punitive penalties and require compensation to represent a reasonable pre-estimate of actual loss.",
+    "required_remedy": "Cap delay damages to a reasonable pre-estimate (e.g. 0.5% per week up to 10% maximum aggregate) and condition enforcement upon proof of actual commercial loss.",
+    "sample_valid_redline": "In the event of an unexcused delay in delivering Milestone 2, Customer shall be entitled to recover, as a genuine pre-estimate of damages and reasonable compensation under Section 74 of the Indian Contract Act, 1872, an amount equal to 0.5% of the delayed milestone fee per complete week of delay, subject to an aggregate liability cap not exceeding ten percent (10%) of the total contract value."
+  },
+  {
+    "id": "draft_redline_03",
+    "statute_type": "PERKINS_EASTMAN_ARBITRATION",
+    "defect_name": "Unilateral Appointment of Sole Arbitrator",
+    "original_clause": "All disputes arising out of this Agreement shall be referred to arbitration by a sole arbitrator nominated and appointed exclusively by the Managing Director of the Company, whose appointment shall be final and binding upon the Contractor.",
+    "statutory_violation": "The Supreme Court in Perkins Eastman Architects DVM v. HSCC (India) Ltd. (2019) and TRF Ltd. v. Energo held that a party having an interest in dispute outcome cannot unilaterally appoint an arbitrator.",
+    "required_remedy": "Provide for mutual consensus appointment or institutional appointment by DIAC / High Court under Section 11 of the Arbitration and Conciliation Act, 1996.",
+    "sample_valid_redline": "All disputes arising under this Agreement shall be referred to arbitration before a sole arbitrator to be appointed by mutual agreement of both parties within thirty (30) days of invocation. Failing mutual consensus, the sole arbitrator shall be designated by the Delhi International Arbitration Centre (DIAC) in accordance with the Arbitration and Conciliation Act, 1996."
+  }
+]

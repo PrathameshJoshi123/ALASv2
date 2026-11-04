@@ -1,0 +1,134 @@
+[
+  {
+    "id": "clause_01",
+    "gold_clause_type": "Limitation of Liability",
+    "text": "IN NO EVENT SHALL EITHER PARTY BE LIABLE TO THE OTHER FOR ANY INDIRECT, INCIDENTAL, SPECIAL, PUNITIVE, EXEMPLARY, OR CONSEQUENTIAL DAMAGES, OR FOR ANY LOSS OF PROFITS, DATA, BUSINESS OPPORTUNITY, OR GOODWILL, ARISING OUT OF OR IN CONNECTION WITH THIS AGREEMENT, REGARDLESS OF THE THEORY OF LIABILITY (WHETHER IN CONTRACT, TORT, STRICT LIABILITY, OR OTHERWISE), EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES. EACH PARTY'S AGGREGATE LIABILITY UNDER THIS AGREEMENT SHALL BE LIMITED TO THE TOTAL FEES PAID OR PAYABLE BY CUSTOMER IN THE TWELVE (12) MONTHS PRECEDING THE CLAIM.",
+    "contract_type": "Master Services Agreement"
+  },
+  {
+    "id": "clause_02",
+    "gold_clause_type": "Indemnification",
+    "text": "Vendor agrees to defend, indemnify, and hold harmless Customer, its affiliates, directors, officers, employees, and agents from and against any and all claims, suits, actions, demands, liabilities, damages, losses, costs, and expenses (including reasonable attorneys' fees) arising out of or resulting from: (a) any breach of Vendor's representations or warranties herein; (b) any claim that the Deliverables or Services infringe or misappropriate any patent, copyright, trademark, trade secret, or other proprietary right of any third party; or (c) gross negligence or willful misconduct of Vendor or its personnel.",
+    "contract_type": "Software Development Agreement"
+  },
+  {
+    "id": "clause_03",
+    "gold_clause_type": "Governing Law",
+    "text": "This Agreement, and all claims or causes of action (whether in contract, tort, or statute) that may be based upon, arise out of, or relate to this Agreement, or the negotiation, execution, or performance of this Agreement, shall be governed by and construed in accordance with the substantive laws of India, without giving effect to any choice or conflict of law provision or rule. The courts situated at New Delhi shall have exclusive territorial jurisdiction over any proceedings arising hereunder.",
+    "contract_type": "Commercial Lease Agreement"
+  },
+  {
+    "id": "clause_04",
+    "gold_clause_type": "Dispute Resolution",
+    "text": "Any dispute, controversy, difference, or claim arising out of or relating to this Agreement, including the existence, validity, interpretation, performance, breach, or termination thereof, shall be referred to and finally resolved by arbitration administered by the Delhi International Arbitration Centre (DIAC) in accordance with the Arbitration and Conciliation Act, 1996. The arbitral tribunal shall consist of a sole arbitrator appointed mutually by the parties. The seat and venue of arbitration shall be New Delhi, and the proceedings shall be conducted in English.",
+    "contract_type": "Shareholders Agreement"
+  },
+  {
+    "id": "clause_05",
+    "gold_clause_type": "Force Majeure",
+    "text": "Neither party shall be liable or responsible to the other party, nor be deemed to have defaulted under or breached this Agreement, for any failure or delay in fulfilling or performing any term of this Agreement (except for payment obligations), when and to the extent such failure or delay is caused by or results from acts of God, flood, fire, earthquake, explosion, war, invasion, hostilities, terrorist threats or acts, riot, civil unrest, government order, law, or action, embargoes, blockades, or national or regional emergency, provided that the affected party gives prompt written notice within five (5) business days and uses diligent efforts to end the failure or delay.",
+    "contract_type": "Supply Chain Agreement"
+  },
+  {
+    "id": "clause_06",
+    "gold_clause_type": "Confidentiality",
+    "text": "Each receiving party agrees to retain in strict confidence all non-public, confidential, or proprietary information disclosed by the disclosing party, whether disclosed orally or in writing, including without limitation technical specifications, source code, financial projections, business methodologies, customer lists, and pricing terms. The receiving party shall exercise the same degree of care to protect such Confidential Information as it uses to protect its own confidential materials of like nature, but in no event less than reasonable care, and shall not disclose Confidential Information to any third party without prior written consent.",
+    "contract_type": "Non-Disclosure Agreement"
+  },
+  {
+    "id": "clause_07",
+    "gold_clause_type": "Intellectual Property",
+    "text": "Customer shall own all right, title, and interest (including all patent, copyright, trademark, trade secret, and other intellectual property rights) in and to all Deliverables, software modifications, custom integrations, work products, and documentation developed or delivered by Service Provider under this Agreement. Service Provider hereby irrevocably assigns, transfers, and conveys to Customer all right, title, and interest in such Deliverables upon creation. Service Provider retains ownership of its pre-existing background intellectual property.",
+    "contract_type": "Technology Services Agreement"
+  },
+  {
+    "id": "clause_08",
+    "gold_clause_type": "Payment",
+    "text": "Customer shall pay all undisputed invoiced amounts within thirty (30) calendar days of the date of Service Provider's invoice. All payments shall be made in Indian Rupees (INR) via electronic funds transfer (NEFT/RTGS) to the designated bank account of Service Provider. Any undisputed payments not received by the due date shall accrue simple interest at the rate of one percent (1.0%) per month or the highest rate permitted by applicable law, whichever is lower, calculated daily from the due date until paid in full.",
+    "contract_type": "Vendor Master Agreement"
+  },
+  {
+    "id": "clause_09",
+    "gold_clause_type": "Termination",
+    "text": "Either party may terminate this Agreement without cause upon giving sixty (60) days prior written notice to the other party. Furthermore, either party may terminate this Agreement immediately upon written notice if: (a) the other party commits a material breach of this Agreement that is incurable, or, if curable, fails to cure such breach within thirty (30) days of receiving written notice thereof; or (b) the other party becomes insolvent, enters into receivership, liquidation, or bankruptcy, or ceases to conduct its business in the ordinary course.",
+    "contract_type": "Employment Agreement"
+  },
+  {
+    "id": "clause_10",
+    "gold_clause_type": "Non-Compete",
+    "text": "During the term of employment and for a period of twenty-four (24) months following termination of employment for any reason, Employee shall not, directly or indirectly, engage in, own, manage, operate, consult for, or be employed by any enterprise or business entity that competes directly with the Company's SaaS business within the territory of India or globally.",
+    "contract_type": "Employment Agreement"
+  },
+  {
+    "id": "clause_11",
+    "gold_clause_type": "Non-Solicitation",
+    "text": "During the term of this Agreement and for twelve (12) months thereafter, Consultant shall not solicit, recruit, induce, or encourage any employee, contractor, or customer of the Company to leave the Company's employ, terminate their engagement, or divert business away from the Company.",
+    "contract_type": "Consulting Agreement"
+  },
+  {
+    "id": "clause_12",
+    "gold_clause_type": "Warranties",
+    "text": "Licensor warrants that the Licensed Software will operate substantially in accordance with the published Documentation for a period of ninety (90) days from delivery. If Licensee notifies Licensor of a defect within the warranty period, Licensor's sole obligation and Licensee's exclusive remedy shall be for Licensor to use commercially reasonable efforts to correct the reproducible non-conformity or, at Licensor's option, refund the license fee paid.",
+    "contract_type": "Software License Agreement"
+  },
+  {
+    "id": "clause_13",
+    "gold_clause_type": "Representations",
+    "text": "Each party represents and warrants to the other that: (i) it is a corporation duly organized, validly existing, and in good standing under the laws of its jurisdiction of incorporation; (ii) it has the full legal power, corporate authority, and authorizations necessary to execute, deliver, and perform this Agreement; and (iii) the execution and performance of this Agreement does not violate any applicable law, judicial decree, or third-party agreement.",
+    "contract_type": "Joint Venture Agreement"
+  },
+  {
+    "id": "clause_14",
+    "gold_clause_type": "Data Protection",
+    "text": "To the extent Service Provider processes any Personal Data on behalf of Customer in performing the Services, Service Provider shall: (a) process such data solely in accordance with Customer's documented lawful instructions and the provisions of the Digital Personal Data Protection Act, 2023 (DPDPA); (b) implement robust technical and organizational security measures, including AES-256 encryption at rest and in transit; and (c) immediately notify Customer within twenty-four (24) hours of becoming aware of any suspected or confirmed personal data breach.",
+    "contract_type": "Data Processing Addendum"
+  },
+  {
+    "id": "clause_15",
+    "gold_clause_type": "Assignment",
+    "text": "Neither party may assign, transfer, delegate, or subcontract any of its rights or obligations under this Agreement, in whole or in part, without the prior written consent of the other party; provided, however, that either party may assign this Agreement without consent to a successor entity in connection with a merger, acquisition, corporate reorganization, or sale of substantially all assets, upon prompt written notice.",
+    "contract_type": "Distribution Agreement"
+  },
+  {
+    "id": "clause_16",
+    "gold_clause_type": "Notices",
+    "text": "All notices, requests, consents, claims, demands, waivers, and other communications hereunder shall be in writing and addressed to the recipient at the registered office address specified in the preamble, and shall be delivered by hand, nationally recognized overnight courier with tracking, or sent by registered post with acknowledgment due, or sent via electronic mail with confirmed receipt.",
+    "contract_type": "Franchise Agreement"
+  },
+  {
+    "id": "clause_17",
+    "gold_clause_type": "Audit",
+    "text": "Upon thirty (30) days prior written notice, Company or its designated independent certified public accountants shall have the right, during normal business hours and without unreasonably disrupting Vendor's operations, to inspect and audit Vendor's books, records, systems, and facilities to verify compliance with the terms and billing calculations of this Agreement.",
+    "contract_type": "Vendor Master Agreement"
+  },
+  {
+    "id": "clause_18",
+    "gold_clause_type": "Compliance",
+    "text": "Both parties shall at all times comply with all applicable local, state, and central statutes, regulations, directives, and ordinances, including without limitation the Prevention of Corruption Act, 1988, the Foreign Corrupt Practices Act (FCPA), labor and environmental safety standards, and export control regulations.",
+    "contract_type": "Procurement Contract"
+  },
+  {
+    "id": "clause_19",
+    "gold_clause_type": "Service Levels",
+    "text": "Provider commits that the Cloud Platform will achieve Monthly Uptime of at least 99.9% during each calendar month. In the event of failure to meet this availability threshold, Customer shall be entitled to receive service credits equal to 10% of the monthly subscription fee for each 0.5% drop in availability below 99.9%, up to a maximum credit of 50% of the monthly fee.",
+    "contract_type": "SLA Agreement"
+  },
+  {
+    "id": "clause_20",
+    "gold_clause_type": "Term",
+    "text": "The term of this Agreement shall commence on the Effective Date and shall continue in full force and effect for an initial period of three (3) calendar years, unless terminated earlier in accordance with the express provisions of Section 12.",
+    "contract_type": "Master Services Agreement"
+  },
+  {
+    "id": "clause_21",
+    "gold_clause_type": "Renewal",
+    "text": "Upon expiration of the Initial Term, this Agreement shall automatically renew for successive one (1) year renewal terms, unless either party delivers written notice of its intention not to renew at least sixty (60) days prior to the expiration of the then-current term.",
+    "contract_type": "Software Subscription Agreement"
+  },
+  {
+    "id": "clause_22",
+    "gold_clause_type": "Insurance",
+    "text": "Throughout the term of this Agreement and for one year thereafter, Contractor shall maintain at its own expense comprehensive commercial general liability insurance with limits not less than INR 10,000,000 per occurrence, professional indemnity (errors & omissions) insurance of INR 20,000,000, and statutory workers' compensation coverage.",
+    "contract_type": "Construction Services Agreement"
+  }
+]

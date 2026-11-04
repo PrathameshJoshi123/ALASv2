@@ -68,12 +68,29 @@ def _fetch_analysis_with_session(db: Any, document_id: str) -> Optional[dict[str
                     "confidence_score": float(c.get("confidence_score", 85.0)),
                 })
 
+    raw_risk = getattr(analysis, "overall_risk_score", 0.0) or 0.0
+    crit_c = getattr(analysis, "critical_issues", 0) or 0
+    high_c = getattr(analysis, "high_issues", 0) or 0
+    med_c = getattr(analysis, "medium_issues", 0) or 0
+    low_c = getattr(analysis, "low_issues", 0) or 0
+    total_cl = max(1, len(formatted_clauses))
+
+    # Self-heal legacy inflated scores (capped at 100% due to legacy additive formula when 0 critical issues exist)
+    if raw_risk >= 99.0 and crit_c == 0 and (high_c > 0 or med_c > 0):
+        weighted_sum = (crit_c * 20.0 + high_c * 10.0 + med_c * 4.0 + low_c * 0.5)
+        raw_risk = round(max(5.0, min(95.0, (weighted_sum / (total_cl ** 0.6)) * 3.8)), 1)
+        try:
+            analysis.overall_risk_score = raw_risk
+            db.commit()
+        except Exception:
+            pass
+
     return {
         "id": analysis.id,
         "document_id": analysis.document_id,
         "contract_type": analysis.contract_type,
         "parties": analysis.parties,
-        "overall_risk_score": getattr(analysis, "overall_risk_score", 0.0) or 0.0,
+        "overall_risk_score": raw_risk,
         "critical_issues": getattr(analysis, "critical_issues", 0) or 0,
         "high_issues": getattr(analysis, "high_issues", 0) or 0,
         "medium_issues": getattr(analysis, "medium_issues", 0) or 0,

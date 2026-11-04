@@ -18,6 +18,7 @@ import toast from "react-hot-toast";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import { apiClient } from "@/services/api";
+import { Markdown, formatLegalMarkdown } from "@/components/ui/markdown";
 
 interface ClauseRedlineModalProps {
   contractId: string;
@@ -72,8 +73,7 @@ export function ClauseRedlineModal({
 
       const formatMd = (raw: string) => {
         if (!raw) return "";
-        // Separate packed numbered list items (e.g. "...required**. 2. **Explicit...") into distinct list lines
-        const normalized = raw.replace(/([.!?])\s+(\d+\.\s+\*\*)/g, "$1\n\n$2");
+        const normalized = formatLegalMarkdown(raw);
         const parsed = marked.parse(normalized);
         const htmlStr = typeof parsed === "string" ? parsed : "";
         return DOMPurify.sanitize(htmlStr);
@@ -104,8 +104,9 @@ export function ClauseRedlineModal({
         favor_party: favorParty,
       });
 
+      const cleanRevisedText = formatLegalMarkdown(data.revised_text || "");
       setRevision({
-        revised_text: data.revised_text,
+        revised_text: cleanRevisedText,
         rationale: data.rationale,
         remedied_risks: data.remedied_risks || [],
         statutory_compliance_notes: data.statutory_compliance_notes || "",
@@ -177,14 +178,15 @@ export function ClauseRedlineModal({
             <div className="p-3.5 bg-amber-50/80 border border-amber-200 rounded-xl flex items-start gap-3 text-xs">
               <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
               <div>
-                <span className="font-semibold text-amber-900">
-                  Identified Vulnerability ({clause.severity}):{" "}
+                <span className="font-semibold text-amber-900 block mb-0.5">
+                  Identified Vulnerability ({clause.severity}):
                 </span>
-                <span className="text-amber-800">{clause.risk_description}</span>
+                <Markdown content={clause.risk_description} className="text-amber-800" />
                 {clause.legal_reasoning && (
-                  <p className="text-amber-700 mt-1 italic">
-                    Legal Note: {clause.legal_reasoning}
-                  </p>
+                  <div className="text-amber-700 mt-1 italic space-y-0.5">
+                    <span className="font-semibold not-italic">Legal Note:</span>
+                    <Markdown content={clause.legal_reasoning} className="text-amber-700 italic" />
+                  </div>
                 )}
               </div>
             </div>
@@ -298,8 +300,8 @@ export function ClauseRedlineModal({
                 <span>Original Clause</span>
                 <span className="text-[10px] text-slate-400 uppercase font-mono">Current Text</span>
               </div>
-              <div className="p-4 flex-1 text-xs text-slate-700 font-mono leading-relaxed whitespace-pre-wrap overflow-y-auto max-h-72">
-                {clause.raw_text}
+              <div className="p-4 flex-1 text-xs text-slate-700 leading-relaxed overflow-y-auto max-h-72 bg-white/40">
+                <Markdown content={clause.raw_text} className="text-xs text-slate-700 leading-relaxed font-sans" />
               </div>
             </div>
 
@@ -379,9 +381,7 @@ export function ClauseRedlineModal({
                     dangerouslySetInnerHTML={{ __html: rationaleHtml }}
                   />
                 ) : (
-                  <p className="text-emerald-900 mt-1 leading-relaxed whitespace-pre-wrap">
-                    {revision.rationale}
-                  </p>
+                  <Markdown content={revision.rationale} className="text-emerald-900 mt-1 leading-relaxed" />
                 )}
 
                 {revision.statutory_compliance_notes && (
@@ -395,9 +395,7 @@ export function ClauseRedlineModal({
                         dangerouslySetInnerHTML={{ __html: notesHtml }}
                       />
                     ) : (
-                      <p className="text-emerald-800 font-mono text-[11px] whitespace-pre-wrap">
-                        {revision.statutory_compliance_notes}
-                      </p>
+                      <Markdown content={revision.statutory_compliance_notes} className="text-emerald-800 font-mono text-[11px]" />
                     )}
                   </div>
                 )}
@@ -412,7 +410,7 @@ export function ClauseRedlineModal({
                     {revision.remedied_risks.map((risk, i) => (
                       <li key={i} className="flex items-center gap-1.5 text-emerald-800 font-medium">
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                        {risk}
+                        <Markdown content={risk} inline />
                       </li>
                     ))}
                   </ul>

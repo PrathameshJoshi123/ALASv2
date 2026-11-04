@@ -188,6 +188,9 @@ function DraftingEditorInner() {
         analysis?.analysis_markdown ||
         contract?.analysis_markdown ||
         contract?.analysis?.analysis_markdown ||
+        contract?.extracted_text ||
+        contract?.raw_text ||
+        contract?.markdown_text ||
         "Analysis markdown will appear here once processing is complete.";
       const sanitized = await renderMarkdownToHtml(content);
       setHtmlContent(sanitized);
@@ -197,6 +200,9 @@ function DraftingEditorInner() {
     analysis?.analysis_markdown,
     contract?.analysis_markdown,
     contract?.analysis?.analysis_markdown,
+    contract?.extracted_text,
+    contract?.raw_text,
+    contract?.markdown_text,
     renderMarkdownToHtml,
   ]);
 

@@ -1,0 +1,84 @@
+[
+  {
+    "id": "rag_01",
+    "question": "What is the liability cap under the Master Software Escrow Agreement, and are there any exclusions to this cap?",
+    "retrieved_contexts": [
+      "Clause 12.1: Each party's aggregate liability under this Agreement shall be limited to the total fees paid or payable by Customer in the twelve (12) months preceding the event giving rise to the claim.",
+      "Clause 12.2: The limitations of liability set forth in Section 12.1 shall not apply to: (a) breach of confidentiality obligations under Section 6; (b) indemnification obligations under Section 8; or (c) damages caused by gross negligence, willful misconduct, or fraud."
+    ],
+    "ground_truth_facts": [
+      "Aggregate liability is capped at total fees paid or payable in the preceding 12 months.",
+      "Exclusions to the cap include breach of confidentiality.",
+      "Exclusions include indemnification obligations.",
+      "Exclusions include gross negligence, willful misconduct, or fraud."
+    ],
+    "reference_answer": "Under Clause 12 of the Master Software Escrow Agreement, each party's aggregate liability is capped at the total fees paid or payable by the Customer in the twelve (12) months preceding the claim. This limitation does not apply to breaches of confidentiality, third-party indemnification obligations, or damages resulting from gross negligence, willful misconduct, or fraud.",
+    "category": "Contract Risk & Liability"
+  },
+  {
+    "id": "rag_02",
+    "question": "Is the post-termination non-compete restriction enforceable under Indian Law?",
+    "retrieved_contexts": [
+      "Clause 14: Employee shall not engage in any competing software enterprise for 24 months following termination within the territory of India.",
+      "Section 27 of the Indian Contract Act, 1872 states: 'Every agreement by which any one is restrained from exercising a lawful profession, trade or business of any kind, is to that extent void.'",
+      "In Percept D'Mark (India) Pvt. Ltd. v. Zaheer Khan (2006) 4 SCC 227, the Supreme Court held that negative covenants operating beyond the term of the contract are void ab initio under Section 27."
+    ],
+    "ground_truth_facts": [
+      "Section 27 of the Indian Contract Act 1872 renders agreements in restraint of trade void.",
+      "Post-termination non-compete clauses are unenforceable and void ab initio in India.",
+      "The Supreme Court affirmed this in Percept D'Mark v. Zaheer Khan.",
+      "Restrictions are only permissible during the active term of employment."
+    ],
+    "reference_answer": "No, the post-termination non-compete restriction is unenforceable under Indian law. Pursuant to Section 27 of the Indian Contract Act, 1872 and settled jurisprudence by the Supreme Court in Percept D'Mark v. Zaheer Khan, any covenant restricting a person from exercising a lawful trade or profession after contract termination is void ab initio.",
+    "category": "Statutory Scrutiny"
+  },
+  {
+    "id": "rag_03",
+    "question": "What procedural defects exist in the seizure memo and electronic evidence collected in FIR 0412/2024?",
+    "retrieved_contexts": [
+      "Exhibit P-1: Seizure Memorandum dated 14/08/2024 conducted at Zenith Towers, Okhla Phase-III. No independent civilian panchas were joined; only police constables attested.",
+      "No cryptographic hash (SHA-256) was generated at the scene when sealing the MacBook Pro serial #C02D19X8MD6R.",
+      "Section 65B(4) of the Indian Evidence Act / Section 63(4) of the Bharatiya Sakshya Adhiniyam mandates a certificate signed by the person in lawful charge of the computer device at the time of producing electronic printouts."
+    ],
+    "ground_truth_facts": [
+      "No independent civilian panchas witnessed the seizure, violating Section 100(4) CrPC.",
+      "Failure to generate SHA-256 cryptographic hash at the scene compromises chain of custody.",
+      "Absence of mandatory Section 65B IEA / Section 63 BSA certificate for electronic printouts."
+    ],
+    "reference_answer": "Two primary procedural defects exist: First, the seizure memo violates Section 100(4) CrPC / Section 105 BNSS because no independent civilian witnesses were joined and no SHA-256 digital hash was generated at the scene. Second, the electronic records lack the mandatory certificate under Section 65B(4) IEA (Section 63 BSA), rendering the digital evidence prima facie inadmissible under the Arjun Panditrao doctrine.",
+    "category": "Litigation Compliance"
+  },
+  {
+    "id": "rag_04",
+    "question": "Does the informant's statement under Section 161 CrPC contradict the allegations of assault in the initial FIR?",
+    "retrieved_contexts": [
+      "FIR No. 0412/2024 alleges that accused Sameer Verma physically assaulted informant Ramesh Gupta and brandished a sharp weapon during the August 10 meeting.",
+      "Statement of Ramesh Gupta recorded under Section 161 CrPC on 18/08/2024 states: 'Contrary to the initial complaint draft, there was no physical assault or brandishing of weapons. Mr. Verma only slammed the conference table.'",
+      "MLC Report from RML Hospital notes a single 1.2 cm superficial scratch classified as 'Simple' with an unexplained 34-hour examination delay."
+    ],
+    "ground_truth_facts": [
+      "FIR alleged physical assault and brandishing of weapons.",
+      "Section 161 CrPC statement directly recants the assault, stating only table slamming occurred.",
+      "MLC confirms only a simple 1.2 cm scratch after a 34-hour delay.",
+      "There is a direct material contradiction between the FIR and the witness statement."
+    ],
+    "reference_answer": "Yes. While the FIR alleged physical assault and brandishing of a weapon during the August 10 meeting, the informant's subsequent Section 161 CrPC statement directly contradicted this narrative by confirming that no physical violence or weapons were involved, only verbal arguments and slamming on the table. The MLC also categorized the injury as a simple superficial scratch examined after a 34-hour delay.",
+    "category": "Witness Testimony"
+  },
+  {
+    "id": "rag_05",
+    "question": "What is the agreed dispute resolution mechanism and arbitral seat under the contract?",
+    "retrieved_contexts": [
+      "Clause 18.1: Any dispute arising out of or in connection with this Agreement shall be referred to and finally resolved by arbitration administered by the Delhi International Arbitration Centre (DIAC).",
+      "Clause 18.2: The arbitral tribunal shall consist of a sole arbitrator appointed mutually. The seat and venue of arbitration shall be New Delhi, and proceedings conducted in English."
+    ],
+    "ground_truth_facts": [
+      "Disputes must be resolved by arbitration administered by DIAC.",
+      "The tribunal consists of a mutually appointed sole arbitrator.",
+      "The seat and venue of arbitration is New Delhi.",
+      "Proceedings must be conducted in English."
+    ],
+    "reference_answer": "Disputes are governed by Clause 18, which mandates institutional arbitration administered by the Delhi International Arbitration Centre (DIAC) under the Arbitration and Conciliation Act, 1996. The seat and venue of arbitration is New Delhi, with a sole arbitrator appointed mutually by both parties.",
+    "category": "Arbitration & Forum"
+  }
+]

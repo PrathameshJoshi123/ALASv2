@@ -1,0 +1,56 @@
+[
+  {
+    "case_id": "apex_vs_zenith",
+    "matter_title": "State & Apex FinTech Ltd. vs. Zenith Cloud Technologies Pvt. Ltd.",
+    "gold_events": [
+      {
+        "event_date": "2024-01-15",
+        "description": "Execution of Master Software Escrow and License Agreement between Apex FinTech and Zenith Cloud.",
+        "source_document": "02_MASTER_ESCROW_AND_SOFTWARE_LICENSE_AGREEMENT.pdf",
+        "page_number": 1
+      },
+      {
+        "event_date": "2024-07-28",
+        "description": "Alleged completion of Milestone 2 and submission of security audit certificate #CG-8829 by Zenith Cloud.",
+        "source_document": "03_EVIDENTIARY_RECORD_BANK_ADVICES_AND_ELECTRONIC_TRANSCRIPTS.pdf",
+        "page_number": 3
+      },
+      {
+        "event_date": "2024-08-05",
+        "description": "Formal legal demand notice issued by Singhania & Partners demanding escrow reconciliation within 15 days.",
+        "source_document": "04_LEGAL_DEMAND_NOTICE_AND_REPLY_MEMORANDUM.pdf",
+        "page_number": 1
+      },
+      {
+        "event_date": "2024-08-10",
+        "description": "Escrow negotiation meeting at Zenith headquarters resulting in heated dispute.",
+        "source_document": "01_FIRST_INFORMATION_REPORT_FIR_0412_2024.pdf",
+        "page_number": 2
+      },
+      {
+        "event_date": "2024-08-12",
+        "description": "Registration of FIR No. 0412/2024 at PS Mandir Marg under Sections 406/420/468/471/120-B IPC.",
+        "source_document": "01_FIRST_INFORMATION_REPORT_FIR_0412_2024.pdf",
+        "page_number": 1
+      },
+      {
+        "event_date": "2024-08-14",
+        "description": "Police seizure of executive laptop and office hard drives without civilian panchas.",
+        "source_document": "06_Forensic_Audit_Report_and_Seizure_Panchnama.pdf",
+        "page_number": 1
+      },
+      {
+        "event_date": "2024-08-18",
+        "description": "Section 161 CrPC witness statement recorded for CFO Ramesh Gupta clarifying absence of assault.",
+        "source_document": "02_PW1_Statement_Ramesh_Gupta_CFO_Sec161CrPC.pdf",
+        "page_number": 1
+      },
+      {
+        "event_date": "2024-09-02",
+        "description": "Section 482 CrPC quashing petition filed before the Hon'ble Delhi High Court.",
+        "source_document": "05_SECTION_482_CRPC_QUASHING_PETITION.pdf",
+        "page_number": 1
+      }
+    ]
+  }
+]

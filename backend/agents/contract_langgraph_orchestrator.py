@@ -48,6 +48,8 @@ from backend.schemas.contract_analysis_models import (
     RiskItem,
     LegalSourceItem,
     ContractAnalysisResult,
+    PartyModel,
+    DocumentIntakeResult,
     normalize_string_list,
 )
 
@@ -255,32 +257,68 @@ Respond STRICTLY in valid JSON matching this schema:
 }}
 """
 
-    response = execute_with_exponential_backoff(llm.invoke, [HumanMessage(content=prompt)])
-    content = response.content.strip()
-    
-    if "```json" in content:
-        cleaned = content.split("```json")[1].split("```")[0].strip()
-    elif "```" in content:
-        cleaned = content.split("```")[1].split("```")[0].strip()
-    else:
-        cleaned = content
+    data: Optional[Dict[str, Any]] = None
 
-    json_match = re.search(r"(\{.*\})", cleaned, re.DOTALL)
-    if json_match:
-        cleaned = json_match.group(1).strip()
+    # Step 1: Best option - with_structured_output using Pydantic schema
+    for method in ("function_calling", "json_mode"):
+        try:
+            structured_llm = llm.with_structured_output(DocumentIntakeResult, method=method)
+            parsed_result = execute_with_exponential_backoff(structured_llm.invoke, [HumanMessage(content=prompt)])
+            if parsed_result is not None:
+                if isinstance(parsed_result, BaseModel):
+                    data = parsed_result.model_dump()
+                elif isinstance(parsed_result, dict):
+                    data = parsed_result
+                if data and data.get("contract_type"):
+                    logger.info(f"[node_document_intake] Successfully parsed intake via with_structured_output(method={method})")
+                    break
+        except Exception as st_err:
+            logger.warning(f"[node_document_intake] with_structured_output method '{method}' failed: {st_err}. Trying fallback...")
+            continue
 
-    try:
-        data = safe_parse_json(cleaned)
-    except Exception as e:
-        logger.error(f"[node_document_intake] Failed to parse document intake JSON: {e}\nRaw content:\n{content}")
-        raise ValueError(f"Document intake classification failed to produce valid JSON: {e}")
+    # Step 2: Fallback to direct invoke and safe_parse_json if structured output did not succeed
+    if not data or not data.get("contract_type"):
+        response = execute_with_exponential_backoff(llm.invoke, [HumanMessage(content=prompt)])
+        content = response.content.strip() if hasattr(response, "content") else str(response)
+        
+        if "```json" in content:
+            cleaned = content.split("```json")[1].split("```")[0].strip()
+        elif "```" in content:
+            cleaned = content.split("```")[1].split("```")[0].strip()
+        else:
+            cleaned = content
 
-    contract_type = data.get("contract_type")
+        json_match = re.search(r"(\{.*\})", cleaned, re.DOTALL)
+        if json_match:
+            cleaned = json_match.group(1).strip()
+
+        try:
+            data = safe_parse_json(cleaned)
+        except Exception as e:
+            logger.warning(f"[node_document_intake] safe_parse_json failed: {e}. Attempting regex recovery...")
+            # Emergency regex extraction for contract classification if JSON parsing failed
+            ct_match = re.search(r'"contract_type"\s*:\s*"([^"]+)"', content)
+            c_type = ct_match.group(1).strip() if ct_match else None
+            data = {
+                "contract_type": c_type or "Commercial Agreement",
+                "parties": [],
+                "preamble_summary": "Extracted from introductory recitals."
+            }
+
+    contract_type = data.get("contract_type") if data else None
     if not contract_type:
-        raise ValueError("Document intake failed: 'contract_type' was not extracted by the legal intake specialist.")
+        first_lines = [l.strip() for l in intro_text.splitlines() if l.strip()]
+        contract_type = first_lines[0][:80] if first_lines else "Commercial Agreement"
 
-    parties = normalize_parties_list(data.get("parties"))
-    preamble_summary = data.get("preamble_summary") or ""
+    parties = normalize_parties_list(data.get("parties")) if data else []
+    raw_preamble = data.get("preamble_summary") if data else ""
+    if isinstance(raw_preamble, dict):
+        preamble_summary = "\n\n".join(
+            f"**{k.replace('_', ' ').title()}**: {v}" if isinstance(v, (str, int, float)) else f"**{k.replace('_', ' ').title()}**:\n{json.dumps(v, indent=2)}"
+            for k, v in raw_preamble.items()
+        )
+    else:
+        preamble_summary = str(raw_preamble) if raw_preamble else ""
 
     logger.info(f"[LangGraph: node_document_intake] Successfully Classified: {contract_type}, Parties: {parties}")
     

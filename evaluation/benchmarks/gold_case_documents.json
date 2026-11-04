@@ -1,0 +1,65 @@
+[
+  {
+    "id": "doc_01",
+    "document_name": "01_FIRST_INFORMATION_REPORT_FIR_0412_2024.pdf",
+    "gold_category": "FIR",
+    "sample_text": "FIRST INFORMATION REPORT (Under Section 154 Cr.P.C. / Section 173 BNSS)\n1. District: New Delhi, Police Station: Mandir Marg, Year: 2024, FIR No: 0412/2024, Date: 12/08/2024.\n2. Acts and Sections: Indian Penal Code 1860, Sections 406, 420, 468, 471, 120-B IPC.\n3. Occurrence of Offence: Day: Saturday, Date: 10/08/2024, Time: 19:30 hrs.\n4. Type of Information: Written Complaint by Ramesh Gupta, Director of Apex FinTech Innovations Ltd.\n5. Details of Complainant: Ramesh Gupta, s/o Late O.P. Gupta, R/o Barakhamba Road, New Delhi.\n6. Details of Suspects: Sameer Verma, MD, and Vikramaditya Singhal, CFO, Zenith Cloud Technologies Pvt. Ltd.\nBrief Facts: The accused dishonestly induced the complainant company to disburse escrow funds amounting to INR 4.25 Crores based on forged security audit certificate #CG-8829, knowing fully well that no escrow milestone had been deployed.",
+    "key_statutory_cites": ["Section 154 CrPC", "Section 420 IPC", "Section 406 IPC"]
+  },
+  {
+    "id": "doc_02",
+    "document_name": "02_BAIL_AND_SUMMONS_ORDER_CRL_MISC_342_2024.pdf",
+    "gold_category": "COURT_ORDER",
+    "sample_text": "IN THE COURT OF CHIEF METROPOLITAN MAGISTRATE, PATIALA HOUSE COURTS, NEW DELHI\nCrl. Misc. No. 342/2024\nIn the matter of: State v. Sameer Verma & Anr. (FIR No. 0412/2024, PS Mandir Marg)\nORDER ON REGULAR BAIL APPLICATION UNDER SECTION 437 CrPC / SECTION 480 BNSS\nPresent: Sh. R.K. Mehta, Ld. APP for the State.\nSh. Abhinav Malhotra, Advocate for the Accused / Applicants.\nHeard rival submissions and perused the police case diary. Considering that the dispute primarily hinges upon a commercial agreement dated 15/01/2024 containing an arbitration clause, and that the accused have joined investigation on two occasions, I am of the considered view that custody is no longer required for interrogation. The applicants are admitted to regular bail subject to furnishing personal bonds of INR 1,00,000/- with one surety of like amount.",
+    "key_statutory_cites": ["Section 437 CrPC", "Section 480 BNSS"]
+  },
+  {
+    "id": "doc_03",
+    "document_name": "03_FINAL_POLICE_REPORT_CHARGE_SHEET_78_2024.pdf",
+    "gold_category": "CHARGE_SHEET",
+    "sample_text": "IN THE COURT OF METROPOLITAN MAGISTRATE, NEW DELHI\nFINAL REPORT / CHARGE SHEET UNDER SECTION 173(2) Cr.P.C. / SECTION 193(3) BNSS\nPolice Station: Mandir Marg, District: New Delhi, Charge Sheet No: 78/2024, Date: 24/09/2024\nFIR No: 0412/2024 Date: 12/08/2024\nName of Investigating Officer: Inspector Rajeshwar Singh, Badge #3812\nOffences Charged: Sections 406, 420, 468, 471, 120-B of Indian Penal Code.\nAccused Sent for Trial: 1. Sameer Verma, Age 42, 2. Vikramaditya Singhal, Age 39.\nList of Prosecution Witnesses: 12 witnesses cited.\nBrief of Prosecution Case: Investigation establishes that accused persons entered into a criminal conspiracy to misappropriate escrow funds by submitting fake bank audit confirmations.",
+    "key_statutory_cites": ["Section 173 CrPC", "Section 193 BNSS", "Section 420 IPC"]
+  },
+  {
+    "id": "doc_04",
+    "document_name": "04_PW1_STATEMENT_RECORDED_SEC161_CRPC.pdf",
+    "gold_category": "WITNESS_STATEMENT",
+    "sample_text": "STATEMENT OF WITNESS UNDER SECTION 161 Cr.P.C. / SECTION 180 BNSS\nPolice Station: Mandir Marg, FIR No: 0412/2024\nName of Witness: Ramesh Gupta, Age: 48 years, Occupation: CFO, Apex FinTech Innovations Ltd.\nAddress: Flat 402, Barakhamba Towers, New Delhi.\nStatement recorded by: Sub-Inspector Amit Kumar.\nStatement: On being questioned, I state that on 10/08/2024 at 19:30 hours, a negotiation meeting took place in the board room of Zenith Cloud Technologies. When I questioned Mr. Sameer Verma about the discrepancy in the escrow reconciliation ledger, heated verbal exchanges took place. Contrary to the initial complaint draft, there was no physical assault or brandishing of weapons. Mr. Verma only slammed the conference table and stated that the funds were utilized towards cloud infrastructure.",
+    "key_statutory_cites": ["Section 161 CrPC", "Section 180 BNSS"]
+  },
+  {
+    "id": "doc_05",
+    "document_name": "05_CENTRAL_FORENSIC_SCIENCE_REPORT_CFSL_DELHI.pdf",
+    "gold_category": "FORENSIC_REPORT",
+    "sample_text": "GOVERNMENT OF INDIA, MINISTRY OF HOME AFFAIRS\nCENTRAL FORENSIC SCIENCE LABORATORY (CFSL), CBI, NEW DELHI\nReport No: CFSL-2024-DOC-8914, Date of Issue: 18/09/2024\nReference: Letter No. 1290/SHO/MM dated 16/08/2024 in FIR No. 0412/2024 PS Mandir Marg.\nSubject: Forensic examination of questioned digital signature and stamp on Escrow Release Certificate #CG-8829.\nDescription of Parcels: Parcel 'A' containing 1 Seagate 2TB Hard Drive bearing serial #NA91029.\nResults of Examination: Microscopic and cryptographic analysis indicates that the digital signature hash applied on document CG-8829 does not match the public key registered with Certifying Authority CCA-India. The timestamp has been retroactively altered by 72 hours.",
+    "key_statutory_cites": ["Section 45 Indian Evidence Act", "Section 39 BSA"]
+  },
+  {
+    "id": "doc_06",
+    "document_name": "06_SEIZURE_PANCHNAMA_AND_SPOT_EVIDENCE_PHOTO.pdf",
+    "gold_category": "EVIDENCE_PHOTO",
+    "sample_text": "SEIZURE MEMORANDUM & SCENE OF CRIME PHOTOGRAPHIC LOG\nPS Mandir Marg, Case FIR No. 0412/2024.\nDate & Time of Seizure: 14/08/2024 at 14:15 hrs.\nLocation: Office cabin of Accused Sameer Verma, 4th Floor, Zenith Towers, Okhla Phase-III, New Delhi.\nPhysical Item Seized: One Apple MacBook Pro 16-inch, Space Grey, Serial #C02D19X8MD6R.\nPhotographic Attachment: Photo Exhibit P-1 showing device on executive desk with screen displaying AWS S3 console.\nNote on Forensic Integrity: Noticeably, no independent civilian panchas were joined during seizure; only Constable Dahiya signed as witness. No SHA-256 hash was generated at the time of sealing the parcel.",
+    "key_statutory_cites": ["Section 100 CrPC", "Section 105 BNSS"]
+  },
+  {
+    "id": "doc_07",
+    "document_name": "07_FORMAL_LEGAL_DEMAND_NOTICE_SINGHANIA_PARTNERS.pdf",
+    "gold_category": "LEGAL_NOTICE",
+    "sample_text": "SINGHANIA & PARTNERS LLP, ADVOCATES & LEGAL CONSULTANTS\nExpress Building, 9-10 Bahadur Shah Zafar Marg, New Delhi 110002\nRef: SP/LIT/2024/0812, Date: 05/08/2024\nTO: 1. Zenith Cloud Technologies Private Limited, 2. Mr. Sameer Verma, Managing Director.\nSUBJECT: LEGAL NOTICE FOR BREACH OF MASTER SOFTWARE ESCROW AGREEMENT DATED 15/01/2024 AND DEMAND FOR REFUND OF INR 4,25,00,000/-.\nSir,\nUnder instructions from and on behalf of our client, M/s Apex FinTech Innovations Ltd., we hereby serve upon you this formal demand notice. You have committed deliberate material breach of Clause 3 and Clause 7 of the Master Escrow Agreement. We hereby call upon you to cure the default within fifteen (15) days of receipt of this notice, failing which our client shall initiate civil recovery and criminal proceedings.",
+    "key_statutory_cites": ["Section 138 NI Act", "Order XXIX CPC"]
+  },
+  {
+    "id": "doc_08",
+    "document_name": "08_CRIMINAL_MISC_MAIN_PETITION_SEC482_CRPC.pdf",
+    "gold_category": "PETITION_AFFIDAVIT",
+    "sample_text": "IN THE HIGH COURT OF DELHI AT NEW DELHI\n(CRIMINAL MISCELLANEOUS JURISDICTION)\nCRL. M.C. NO. 4920 OF 2024\nIN THE MATTER OF: SAMEER VERMA & ANR. ...PETITIONERS\nVERSUS\nSTATE (NCT OF DELHI) & ANR. ...RESPONDENTS\nPETITION UNDER SECTION 482 OF THE CODE OF CRIMINAL PROCEDURE, 1973 (CORRESPONDING TO SECTION 528 OF BHARATIYA NAGARIK SURAKSHA SANHITA, 2023) FOR QUASHING OF FIR NO. 0412/2024 DATED 12/08/2024 REGISTERED AT PS MANDIR MARG AND ALL CONSEQUENTIAL PROCEEDINGS.\nMost Respectfully Showeth:\n1. That the Petitioner is a law-abiding citizen and founder of a reputed tech startup.\n2. That the dispute in question is an unadulterated commercial disagreement arising out of a software development contract containing an express arbitration agreement under the DIAC rules.\n3. That the Hon'ble Supreme Court in Bhajan Lal, Dalip Kaur, and Indian Oil Corporation has categorically held that criminal prosecution cannot be used as an arm-twisting tool to settle commercial debts.",
+    "key_statutory_cites": ["Section 482 CrPC", "Section 528 BNSS"]
+  },
+  {
+    "id": "doc_09",
+    "document_name": "09_CERTIFICATE_OF_INCORPORATION_AND_MEMORANDUM.pdf",
+    "gold_category": "OTHER",
+    "sample_text": "GOVERNMENT OF INDIA, MINISTRY OF CORPORATE AFFAIRS\nRegistrar of Companies, Delhi and Haryana\nCERTIFICATE OF INCORPORATION\n[Pursuant to sub-section (2) of section 7 and sub-section (1) of section 8 of the Companies Act, 2013 and rule 18 of the Companies (Incorporation) Rules, 2014]\nCorporate Identity Number (CIN): U72900DL2021PTC381920\nI hereby certify that ZENITH CLOUD TECHNOLOGIES PRIVATE LIMITED is incorporated on this Twelfth day of March Two Thousand Twenty-One under the Companies Act, 2013 and that the company is limited by shares. Given under my hand at New Delhi this 12th day of March 2021.\nAssistant Registrar of Companies, Delhi.",
+    "key_statutory_cites": ["Section 7 Companies Act 2013"]
+  }
+]

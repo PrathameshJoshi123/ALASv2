@@ -1,0 +1,29 @@
+[
+  {
+    "scenario_id": "moot_01",
+    "case_title": "State (NCT of Delhi) & Apex FinTech v. Zenith Cloud Technologies",
+    "contentious_issues": [
+      {
+        "issue_number": 1,
+        "title": "Maintainability of Criminal FIR 0412/2024 in a Commercial Contractual Dispute with Arbitration",
+        "statutory_matrix": "Section 482 CrPC / Section 528 BNSS vs Section 406/420 IPC",
+        "prosecution_doctrine": "State of Haryana v. Bhajan Lal (1992) - Allegations disclose fraudulent inducement at inception and forgery of escrow certificate #CG-8829, which cannot be stifled under inherent powers.",
+        "defense_doctrine": "Dalip Kaur v. Jagnar Singh (2009) & Indian Oil Corp. v. NEPC India Ltd. (2006) - Pure commercial milestone dispute arising out of Clause 3 & 18 cannot be converted into criminal prosecution to exert pressure."
+      },
+      {
+        "issue_number": 2,
+        "title": "Admissibility of Digital Server Logs and Electronic WhatsApp Transcripts Lacking 65B Certification",
+        "statutory_matrix": "Section 65B(4) Indian Evidence Act / Section 63(4) Bharatiya Sakshya Adhiniyam",
+        "prosecution_doctrine": "State of Karnataka v. T. Naseer (2023) - Defect in Section 65B certificate is curable during trial stage before charge framing.",
+        "defense_doctrine": "Arjun Panditrao Khotkar v. Kailash Kushanrao Gorantyal (2020) 7 SCC 1 - Production of certificate under Section 65B(4) is a mandatory condition precedent for electronic record admissibility."
+      },
+      {
+        "issue_number": 3,
+        "title": "Establishment of Dishonest Mens Rea at Inception for Cheating under Section 420 IPC / 318 BNS",
+        "statutory_matrix": "Section 415/420 Indian Penal Code / Section 316/318 Bharatiya Nyaya Sanhita",
+        "prosecution_doctrine": "Ram Biraji Devi v. Umesh Kumar Singh (2006) - False representation regarding security audit certificate establishes fraudulent intent from inception.",
+        "defense_doctrine": "Hridaya Ranjan Prasad Verma v. State of Bihar (2000) 4 SCC 168 - Distinction between mere breach of contract and cheating depends on fraudulent intention at the very beginning of the transaction."
+      }
+    ]
+  }
+]

@@ -1,0 +1,31 @@
+[
+  {
+    "case_id": "apex_vs_zenith",
+    "gold_contradictions": [
+      {
+        "witness_name": "Ramesh Gupta (Informant / CFO)",
+        "conflicting_party_or_record": "FIR No. 0412/2024 Narrative",
+        "defect_type": "Direct Contradiction",
+        "description": "FIR alleged intentional physical assault and weapon brandishing during the August 10 meeting, whereas PW-1 Section 161 CrPC statement directly recanted this, stating no assault occurred and only table banging transpired.",
+        "impeachment_severity": "High",
+        "citation_quote": "Contrary to the initial complaint draft, there was no physical assault or brandishing of weapons."
+      },
+      {
+        "witness_name": "Ramesh Gupta (Informant)",
+        "conflicting_party_or_record": "MLC Medical Report Dr. Anurag Batra",
+        "defect_type": "Material Omission & Delay",
+        "description": "Informant claimed severe grievous bodily harm, yet the hospital examination took place 34 hours later with the medical officer classifying the finding as a solitary superficial 1.2 cm scratch.",
+        "impeachment_severity": "High",
+        "citation_quote": "Simple in nature, single superficial scratch 1.2cm on dorsal forearm, patient presented after 34 hours."
+      },
+      {
+        "witness_name": "Sameer Verma (MD / CTO Statement)",
+        "conflicting_party_or_record": "FIR Allegation of Zero Code Deployment",
+        "defect_type": "Material Contradiction",
+        "description": "FIR alleged total fraudulent non-performance from inception, whereas AWS deployment logs and CTO deposition confirm over 85,000 lines of functional code were committed to staging servers prior to dispute.",
+        "impeachment_severity": "Medium",
+        "citation_quote": "85,000 lines of microservices code deployed on AWS staging environment with verified CI/CD commits."
+      }
+    ]
+  }
+]

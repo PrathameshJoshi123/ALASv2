@@ -18,6 +18,7 @@ import {
   Gavel,
 } from "lucide-react";
 import { apiClient } from "@/services/api";
+import { Markdown } from "@/components/ui/markdown";
 
 export interface DraftEvent {
   document_id: string;
@@ -410,13 +411,13 @@ export function DraftingStreamConsole({
                     >
                       {evt.milestone}
                     </span>
-                    <p
+                    <div
                       className={`text-[11px] leading-relaxed break-words ${
                         isLast ? "text-slate-100 font-medium" : "text-slate-400"
                       }`}
                     >
-                      {evt.message}
-                    </p>
+                      <Markdown content={evt.message} inline />
+                    </div>
                   </div>
                 );
               })

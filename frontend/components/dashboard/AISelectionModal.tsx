@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { apiClient } from "@/services/api";
+import { Markdown } from "@/components/ui/markdown";
 
 interface AISelectionModalProps {
   isOpen: boolean;
@@ -212,8 +213,8 @@ export function AISelectionModal({
                   Proposed AI Redraft
                 </span>
                 {revision.statutory_compliance_notes && (
-                  <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-full">
-                    {revision.statutory_compliance_notes}
+                  <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-full inline-flex items-center">
+                    <Markdown content={revision.statutory_compliance_notes} inline />
                   </span>
                 )}
               </div>
@@ -225,7 +226,7 @@ export function AISelectionModal({
               {revision.rationale && (
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 space-y-1">
                   <span className="font-bold text-slate-800">Legal Rationale: </span>
-                  <span>{revision.rationale}</span>
+                  <Markdown content={revision.rationale} className="text-xs text-slate-700 leading-relaxed" />
                 </div>
               )}
 
@@ -236,8 +237,8 @@ export function AISelectionModal({
                       key={i}
                       className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-md font-medium"
                     >
-                      <ShieldAlert className="w-3 h-3 text-amber-600" />
-                      {risk}
+                      <ShieldAlert className="w-3 h-3 text-amber-600 shrink-0" />
+                      <Markdown content={risk} inline />
                     </span>
                   ))}
                 </div>

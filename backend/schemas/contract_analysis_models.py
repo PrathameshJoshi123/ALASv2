@@ -189,6 +189,28 @@ class LegalSourceItem(BaseModel):
     key_provision_or_ratio: Optional[str] = None
 
 
+class PartyModel(BaseModel):
+    """Contracting party representation extracted during intake."""
+    name: str = Field(default="", description="Full legal name of the entity or party")
+    role: Optional[str] = Field(default=None, description="Designated role, e.g. Lessor, Lessee, Disclosing Party, Contractor, Employer")
+    formal_designation: Optional[str] = Field(default=None, description="Corporate, legal, or statutory designation, e.g. Proprietor, Autonomous Body, Private Limited Company")
+
+
+class DocumentIntakeResult(BaseModel):
+    """Structured output schema for Document Intake classification."""
+    contract_type: str = Field(
+        description="Exact legal classification of the contract (e.g. Commercial Lease Agreement, Master Services Agreement, Non-Disclosure Agreement, Employment Agreement, EPC Contract)"
+    )
+    parties: List[Any] = Field(
+        default_factory=list,
+        description="List of contracting parties, either as Party objects with name and role or strings"
+    )
+    preamble_summary: Any = Field(
+        default="",
+        description="Concise legal narrative summary of recitals, demised premises/scope, consideration, execution date, and legal intent"
+    )
+
+
 class ContractAnalysisResult(BaseModel):
     """
     Final result produced by the contract analysis orchestrator.
