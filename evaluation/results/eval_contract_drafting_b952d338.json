@@ -1,0 +1,103 @@
+{
+  "evaluation_metadata": {
+    "evaluation_timestamp": "2026-11-04T07:07:00Z",
+    "evaluator": "Contract Drafting Evaluation Specialist",
+    "evaluation_standard": "Institutional Legal Drafting & Indian Contract Act 1872 DevOps Standard",
+    "database_write_status": "ZERO WRITES (STRICT READ-ONLY EXECUTION)"
+  },
+  "contract_metadata": {
+    "document_id": "b952d338-8531-437e-ade6-7cd962bb7f99",
+    "draft_id": "125c8043-f81c-466b-a0e4-aa6c99786ee5",
+    "document_name": "Master_Services_Agreement_(MSA)_b952d338.pdf",
+    "contract_title": "Master Services Agreement (MSA)",
+    "contract_type": "Master Services Agreement (MSA)",
+    "parties": [
+      "CloudScale Technologies Pvt. Ltd. (Service Provider)",
+      "Apex Retail Enterprises Ltd. (Customer)"
+    ],
+    "system_compliance_score": 92.0,
+    "review_comments": [
+      "Contract meets statutory requirements under Indian Contract Act 1872"
+    ],
+    "character_count": 129184,
+    "word_count": 18858,
+    "line_count": 1782
+  },
+  "structural_completeness": {
+    "total_blueprint_sections": 14,
+    "sections_detected": 14,
+    "completeness_ratio": 1.0,
+    "sections_audit": [
+      {"section_number": 1, "section_name": "PREAMBLE & PARTIES", "status": "VERIFIED_PRESENT"},
+      {"section_number": 2, "section_name": "RECITALS & TRANSACTIONAL BACKGROUND", "status": "VERIFIED_PRESENT"},
+      {"section_number": 3, "section_name": "DEFINITIONS & RULES OF INTERPRETATION", "status": "VERIFIED_PRESENT"},
+      {"section_number": 4, "section_name": "SCOPE OF COMMERCIAL ENGAGEMENT / DELIVERABLES / SLAs", "status": "VERIFIED_PRESENT"},
+      {"section_number": 5, "section_name": "CONSIDERATION, INVOICING, TAXES (GST) & PAYMENT TERMS", "status": "VERIFIED_PRESENT"},
+      {"section_number": 6, "section_name": "REPRESENTATIONS & WARRANTIES", "status": "VERIFIED_PRESENT"},
+      {"section_number": 7, "section_name": "CONFIDENTIALITY & NON-DISCLOSURE", "status": "VERIFIED_PRESENT"},
+      {"section_number": 8, "section_name": "INTELLECTUAL PROPERTY RIGHTS & OWNERSHIP", "status": "VERIFIED_PRESENT"},
+      {"section_number": 9, "section_name": "TERM, RENEWAL & TERMINATION", "status": "VERIFIED_PRESENT"},
+      {"section_number": 10, "section_name": "INDEMNIFICATION & LIMITATION OF LIABILITY", "status": "VERIFIED_PRESENT"},
+      {"section_number": 11, "section_name": "DISPUTE RESOLUTION & ARBITRATION", "status": "VERIFIED_PRESENT"},
+      {"section_number": 12, "section_name": "GOVERNING LAW & JURISDICTION", "status": "VERIFIED_PRESENT"},
+      {"section_number": 13, "section_name": "MISCELLANEOUS BOILERPLATE", "status": "VERIFIED_PRESENT"},
+      {"section_number": 14, "section_name": "EXECUTION & SIGNATURES", "status": "VERIFIED_PRESENT"}
+    ]
+  },
+  "statutory_compliance_audit": {
+    "section_27_restraint_of_trade": {
+      "status": "PASS (Enforceable)",
+      "statutory_basis": "Section 27, Indian Contract Act 1872; Percept D'Mark v. Zaheer Khan (2006)",
+      "finding": "Void post-termination blanket non-compete avoided; covenants confined to employee non-solicitation (2 years) and trade secret non-disclosure."
+    },
+    "section_74_liquidated_damages": {
+      "status": "FAIL / DEFECT DETECTED",
+      "statutory_basis": "Section 74, Indian Contract Act 1872; Kailash Nath Associates v. DDA (2015)",
+      "finding": "Clause 5.4.3 labels 1.5% monthly compounding late fee as a 'Late Payment Penalty' rather than a genuine pre-estimate of loss or reasonable compensation cap."
+    },
+    "perkins_eastman_arbitration_neutrality": {
+      "status": "PASS (Neutral)",
+      "statutory_basis": "Section 12(5) ACA 1996; Perkins Eastman Architects DPC v. HSCC (India) Ltd. (2020)",
+      "finding": "Arbitrator appointed by mutual consent with neutral institutional fallback (ICC Secretary-General / Bangalore City Civil Court)."
+    },
+    "section_28_restraint_of_legal_proceedings": {
+      "status": "PASS (Enforceable)",
+      "statutory_basis": "Section 28, Indian Contract Act 1872; Hakam Singh v. Gammon (India) Ltd.",
+      "finding": "Exclusive jurisdiction vested in competent Courts of Bengaluru where parties execute obligations."
+    }
+  },
+  "version_evolution": {
+    "total_versions": 2,
+    "version_1": {
+      "version_number": 1,
+      "created_at": "2026-11-01T19:45:46.310996+00:00",
+      "character_count": 138710,
+      "word_count": 19684,
+      "format": "Autonomous LLM Markdown"
+    },
+    "version_2": {
+      "version_number": 2,
+      "created_at": "2026-11-01T19:51:02.227137+00:00",
+      "character_count": 129184,
+      "word_count": 18858,
+      "format": "Institutional Legal Plain Text (Production Edited)"
+    },
+    "delta": {
+      "character_delta": -9526,
+      "percentage_change": -6.87,
+      "substantive_covenants_preserved": true
+    }
+  },
+  "citation_authenticity": {
+    "total_citations": 4,
+    "valid_citations": 4,
+    "authenticity_rate": 1.0,
+    "citations": [
+      {"doc_id": "1625889", "title": "Section 23 in The Indian Contract Act, 1872", "url": "https://indiankanoon.org/doc/1625889/"},
+      {"doc_id": "536284", "title": "Section 34 in The Arbitration And Conciliation Act, 1996", "url": "https://indiankanoon.org/doc/536284/"},
+      {"doc_id": "161368135", "title": "Eit Services India Private Limited vs India Post Payments Bank Limited & Anr.", "url": "https://indiankanoon.org/doc/161368135/"},
+      {"doc_id": "43025115", "title": "Meta Platforms Inc vs Competition Commission Of India & Ors", "url": "https://indiankanoon.org/doc/43025115/"}
+    ]
+  }
+}
+

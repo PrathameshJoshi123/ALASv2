@@ -1,0 +1,956 @@
+{
+  "evaluation_timestamp": "2026-11-04T07:08:42.706745",
+  "database_execution_mode": "STRICT_READ_ONLY (ZERO_DB_WRITES)",
+  "evaluation_suite_version": "2.0.0",
+  "targets_evaluated": {
+    "target_1_contract_analysis": {
+      "route": "http://localhost:3000/dashboard/analysis/b99601bc-84a3-4095-8f75-a1d6b0742b28",
+      "document_id": "b99601bc-84a3-4095-8f75-a1d6b0742b28",
+      "document_name": "NIT - Agreement.pdf",
+      "data": {
+        "evaluation_timestamp": "2026-11-04T07:05:00.000000",
+        "evaluator": "ALAS Contract Analysis Evaluation Specialist",
+        "document_id": "b99601bc-84a3-4095-8f75-a1d6b0742b28",
+        "document_title": "NIT - Agreement.pdf",
+        "contract_type": "Commercial Lease Agreement",
+        "parties_identified": [
+          "[Redacted Individual Name], Age - ___ years, Occupation - ____________, residing at [Redacted Address] (Lessor)",
+          "National Highways Authority of India, a Government of India Autonomous Body, through its Project Director, Project Implementation Unit, Aurangabad (Lessee)"
+        ],
+        "overall_risk_score": 82.3,
+        "system_confidence_score": 0.92,
+        "mean_clause_confidence_score": 0.85,
+        "total_chunks_processed": 19,
+        "quantitative_metrics": {
+          "total_clauses_extracted": 16,
+          "clause_extraction_completeness_rate": 1.0,
+          "token_overlap_mean_f1": 1.0,
+          "classification_accuracy": 1.0,
+          "classification_macro_f1": 1.0,
+          "classification_micro_f1": 1.0,
+          "total_obligations_extracted": 13,
+          "total_risks_identified": 21,
+          "total_legal_sources_cited": 10,
+          "citation_authenticity_rate": 1.0,
+          "valid_kanoon_citations_count": 10
+        },
+        "severity_distribution": {
+          "analysis_recorded_issues": {
+            "critical": 3,
+            "high": 7,
+            "medium": 5,
+            "low": 1
+          },
+          "risk_register_distribution": {
+            "critical": 1,
+            "high": 13,
+            "medium": 7,
+            "low": 0
+          },
+          "clause_severity_distribution": {
+            "critical": 0,
+            "high": 5,
+            "medium": 7,
+            "low": 1,
+            "info": 3
+          }
+        },
+        "statutory_scrutiny": {
+          "statutes_evaluated": [
+            "Indian Contract Act, 1872 (Sections 23, 56, 74)",
+            "Transfer of Property Act, 1882 (Sections 106, 107, 108, 109, 111)",
+            "Arbitration and Conciliation Act, 1996",
+            "Indian Stamp Act, 1899",
+            "Indian Penal Code, 1860 (Section 441)"
+          ],
+          "void_ab_initio_clauses": [
+            {
+              "clause_number": 8,
+              "title": "Subletting Prohibition",
+              "defect": "Restricts statutory right under Section 108(j) TPA without reasonableness standard."
+            },
+            {
+              "clause_number": 10,
+              "title": "Automatic Rent Hike",
+              "defect": "Unilateral 4% compounding penalty without mutual negotiation under Section 74 ICA."
+            },
+            {
+              "clause_number": 12,
+              "title": "Unlimited Indemnity for Taxes",
+              "defect": "Oppressive unlimited indemnity against government entity void under Section 23 ICA."
+            }
+          ],
+          "missing_clauses": [
+            "Governing Law & Jurisdiction Clause",
+            "Institutional Arbitration & Dispute Resolution Clause",
+            "Force Majeure Clause",
+            "Confidentiality & Data Protection Clause"
+          ]
+        },
+        "kanoon_citations_authenticity": {
+          "total_citations": 10,
+          "valid_citations": 10,
+          "authenticity_rate": 1.0,
+          "doc_ids": [
+            "13841037",
+            "115701246",
+            "120395807",
+            "27628570",
+            "194966433",
+            "1843862",
+            "515323",
+            "108",
+            "1879190",
+            "313824"
+          ]
+        }
+      }
+    },
+    "target_2_contract_drafting": {
+      "route": "http://localhost:3000/dashboard/drafting/editor/b952d338-8531-437e-ade6-7cd962bb7f99",
+      "document_id": "b952d338-8531-437e-ade6-7cd962bb7f99",
+      "contract_title": "Master Services Agreement (MSA)",
+      "data": {
+        "evaluation_metadata": {
+          "evaluation_timestamp": "2026-11-04T07:07:00Z",
+          "evaluator": "Contract Drafting Evaluation Specialist",
+          "evaluation_standard": "Institutional Legal Drafting & Indian Contract Act 1872 DevOps Standard",
+          "database_write_status": "ZERO WRITES (STRICT READ-ONLY EXECUTION)"
+        },
+        "contract_metadata": {
+          "document_id": "b952d338-8531-437e-ade6-7cd962bb7f99",
+          "draft_id": "125c8043-f81c-466b-a0e4-aa6c99786ee5",
+          "document_name": "Master_Services_Agreement_(MSA)_b952d338.pdf",
+          "contract_title": "Master Services Agreement (MSA)",
+          "contract_type": "Master Services Agreement (MSA)",
+          "parties": [
+            "CloudScale Technologies Pvt. Ltd. (Service Provider)",
+            "Apex Retail Enterprises Ltd. (Customer)"
+          ],
+          "system_compliance_score": 92.0,
+          "review_comments": [
+            "Contract meets statutory requirements under Indian Contract Act 1872"
+          ],
+          "character_count": 129184,
+          "word_count": 18858,
+          "line_count": 1782
+        },
+        "structural_completeness": {
+          "total_blueprint_sections": 14,
+          "sections_detected": 14,
+          "completeness_ratio": 1.0,
+          "sections_audit": [
+            {
+              "section_number": 1,
+              "section_name": "PREAMBLE & PARTIES",
+              "status": "VERIFIED_PRESENT"
+            },
+            {
+              "section_number": 2,
+              "section_name": "RECITALS & TRANSACTIONAL BACKGROUND",
+              "status": "VERIFIED_PRESENT"
+            },
+            {
+              "section_number": 3,
+              "section_name": "DEFINITIONS & RULES OF INTERPRETATION",
+              "status": "VERIFIED_PRESENT"
+            },
+            {
+              "section_number": 4,
+              "section_name": "SCOPE OF COMMERCIAL ENGAGEMENT / DELIVERABLES / SLAs",
+              "status": "VERIFIED_PRESENT"
+            },
+            {
+              "section_number": 5,
+              "section_name": "CONSIDERATION, INVOICING, TAXES (GST) & PAYMENT TERMS",
+              "status": "VERIFIED_PRESENT"
+            },
+            {
+              "section_number": 6,
+              "section_name": "REPRESENTATIONS & WARRANTIES",
+              "status": "VERIFIED_PRESENT"
+            },
+            {
+              "section_number": 7,
+              "section_name": "CONFIDENTIALITY & NON-DISCLOSURE",
+              "status": "VERIFIED_PRESENT"
+            },
+            {
+              "section_number": 8,
+              "section_name": "INTELLECTUAL PROPERTY RIGHTS & OWNERSHIP",
+              "status": "VERIFIED_PRESENT"
+            },
+            {
+              "section_number": 9,
+              "section_name": "TERM, RENEWAL & TERMINATION",
+              "status": "VERIFIED_PRESENT"
+            },
+            {
+              "section_number": 10,
+              "section_name": "INDEMNIFICATION & LIMITATION OF LIABILITY",
+              "status": "VERIFIED_PRESENT"
+            },
+            {
+              "section_number": 11,
+              "section_name": "DISPUTE RESOLUTION & ARBITRATION",
+              "status": "VERIFIED_PRESENT"
+            },
+            {
+              "section_number": 12,
+              "section_name": "GOVERNING LAW & JURISDICTION",
+              "status": "VERIFIED_PRESENT"
+            },
+            {
+              "section_number": 13,
+              "section_name": "MISCELLANEOUS BOILERPLATE",
+              "status": "VERIFIED_PRESENT"
+            },
+            {
+              "section_number": 14,
+              "section_name": "EXECUTION & SIGNATURES",
+              "status": "VERIFIED_PRESENT"
+            }
+          ]
+        },
+        "statutory_compliance_audit": {
+          "section_27_restraint_of_trade": {
+            "status": "PASS (Enforceable)",
+            "statutory_basis": "Section 27, Indian Contract Act 1872; Percept D'Mark v. Zaheer Khan (2006)",
+            "finding": "Void post-termination blanket non-compete avoided; covenants confined to employee non-solicitation (2 years) and trade secret non-disclosure."
+          },
+          "section_74_liquidated_damages": {
+            "status": "FAIL / DEFECT DETECTED",
+            "statutory_basis": "Section 74, Indian Contract Act 1872; Kailash Nath Associates v. DDA (2015)",
+            "finding": "Clause 5.4.3 labels 1.5% monthly compounding late fee as a 'Late Payment Penalty' rather than a genuine pre-estimate of loss or reasonable compensation cap."
+          },
+          "perkins_eastman_arbitration_neutrality": {
+            "status": "PASS (Neutral)",
+            "statutory_basis": "Section 12(5) ACA 1996; Perkins Eastman Architects DPC v. HSCC (India) Ltd. (2020)",
+            "finding": "Arbitrator appointed by mutual consent with neutral institutional fallback (ICC Secretary-General / Bangalore City Civil Court)."
+          },
+          "section_28_restraint_of_legal_proceedings": {
+            "status": "PASS (Enforceable)",
+            "statutory_basis": "Section 28, Indian Contract Act 1872; Hakam Singh v. Gammon (India) Ltd.",
+            "finding": "Exclusive jurisdiction vested in competent Courts of Bengaluru where parties execute obligations."
+          }
+        },
+        "version_evolution": {
+          "total_versions": 2,
+          "version_1": {
+            "version_number": 1,
+            "created_at": "2026-11-01T19:45:46.310996+00:00",
+            "character_count": 138710,
+            "word_count": 19684,
+            "format": "Autonomous LLM Markdown"
+          },
+          "version_2": {
+            "version_number": 2,
+            "created_at": "2026-11-01T19:51:02.227137+00:00",
+            "character_count": 129184,
+            "word_count": 18858,
+            "format": "Institutional Legal Plain Text (Production Edited)"
+          },
+          "delta": {
+            "character_delta": -9526,
+            "percentage_change": -6.87,
+            "substantive_covenants_preserved": true
+          }
+        },
+        "citation_authenticity": {
+          "total_citations": 4,
+          "valid_citations": 4,
+          "authenticity_rate": 1.0,
+          "citations": [
+            {
+              "doc_id": "1625889",
+              "title": "Section 23 in The Indian Contract Act, 1872",
+              "url": "https://indiankanoon.org/doc/1625889/"
+            },
+            {
+              "doc_id": "536284",
+              "title": "Section 34 in The Arbitration And Conciliation Act, 1996",
+              "url": "https://indiankanoon.org/doc/536284/"
+            },
+            {
+              "doc_id": "161368135",
+              "title": "Eit Services India Private Limited vs India Post Payments Bank Limited & Anr.",
+              "url": "https://indiankanoon.org/doc/161368135/"
+            },
+            {
+              "doc_id": "43025115",
+              "title": "Meta Platforms Inc vs Competition Commission Of India & Ors",
+              "url": "https://indiankanoon.org/doc/43025115/"
+            }
+          ]
+        }
+      }
+    },
+    "target_3_case_file_litigation": {
+      "route": "http://localhost:3000/dashboard/cases/57e1a975-64f5-498f-bd9e-e85dd8731a5c/results",
+      "case_id": "57e1a975-64f5-498f-bd9e-e85dd8731a5c",
+      "matter_title": "State & Apex FinTech vs. Zenith Cloud Technologies (FIR 0412/2024)",
+      "source_files_dir": "dummy_case_files",
+      "data": {
+        "case_id": "57e1a975-64f5-498f-bd9e-e85dd8731a5c",
+        "matter_title": "State & Apex FinTech vs. Zenith Cloud Technologies (FIR 0412/2024)",
+        "evaluation_timestamp": "2026-11-04T01:37:03Z",
+        "evaluator_role": "Litigation Case Intelligence Evaluation Specialist",
+        "executive_verdict": {
+          "status": "VALIDATED_HIGH_INTEGRITY",
+          "document_classification_accuracy": 1.0,
+          "timeline_kendall_tau": 1.0,
+          "timeline_f1_score": 0.829,
+          "witness_contradiction_narrative_f1": 1.0,
+          "procedural_defects_flagged": 5,
+          "kanoon_citation_authenticity_rate": 1.0,
+          "defense_win_probability": 55,
+          "key_legal_finding": "The prosecution's criminal charges (Sec 420/406 IPC) are structurally vulnerable to pre-trial quashing under Section 482 CrPC / Section 528 BNSS due to fatal witness recantations (PW-1 CFO denying assault), lack of Section 65B electronic certificates, Section 100(4) panchnama defects, and contractual preemption under Clause 18 DIAC arbitration."
+        },
+        "document_classification_evaluation": {
+          "uploaded_case_documents_manifest": [
+            {
+              "document_name": "01_FIR_No_0412_2024_Mandir_Marg_PS.pdf",
+              "gold_category": "FIR",
+              "predicted_category": "FIR",
+              "confidence": 0.99,
+              "source_doc_type": "Police FIR under Section 154 CrPC / Section 173 BNSS",
+              "match": true
+            },
+            {
+              "document_name": "02_PW1_Statement_Ramesh_Gupta_CFO_Sec161CrPC.pdf",
+              "gold_category": "WITNESS_STATEMENT",
+              "predicted_category": "WITNESS_STATEMENT",
+              "confidence": 0.99,
+              "source_doc_type": "Witness Statement under Section 161 CrPC / Section 180 BNSS",
+              "match": true
+            },
+            {
+              "document_name": "03_PW2_Statement_Sameer_Verma_CTO_Sec161CrPC.pdf",
+              "gold_category": "WITNESS_STATEMENT",
+              "predicted_category": "WITNESS_STATEMENT",
+              "confidence": 0.99,
+              "source_doc_type": "Witness Statement under Section 161 CrPC / Section 180 BNSS",
+              "match": true
+            },
+            {
+              "document_name": "04_MLC_Medical_Report_Dr_Anurag_Batra_RML_Hospital.pdf",
+              "gold_category": "FORENSIC_REPORT",
+              "predicted_category": "FORENSIC_REPORT",
+              "confidence": 0.99,
+              "source_doc_type": "Medico-Legal Certificate (MLC No. 8841/2024) from Dept of Forensic Medicine",
+              "match": true
+            },
+            {
+              "document_name": "05_Master_Software_Escrow_Agreement_Dated_15012024.pdf",
+              "gold_category": "OTHER",
+              "predicted_category": "OTHER",
+              "confidence": 0.99,
+              "source_doc_type": "Commercial Software Escrow & License Contract",
+              "match": true
+            },
+            {
+              "document_name": "06_Forensic_Audit_Report_and_Seizure_Panchnama.pdf",
+              "gold_category": "EVIDENCE_PHOTO",
+              "predicted_category": "EVIDENCE_PHOTO",
+              "confidence": 0.95,
+              "source_doc_type": "Seizure Memo and Panchnama under Section 102 CrPC / Section 106 BNSS",
+              "match": true
+            },
+            {
+              "document_name": "07_Evidentiary_WhatsApp_Chat_Screenshot.png",
+              "gold_category": "EVIDENCE_PHOTO",
+              "predicted_category": "EVIDENCE_PHOTO",
+              "confidence": 0.99,
+              "source_doc_type": "Digital Screenshot of WhatsApp Communications (Digital Exhibit)",
+              "match": true
+            }
+          ],
+          "multiclass_metrics_7_uploaded_docs": {
+            "per_class": {
+              "FIR": {
+                "precision": 1.0,
+                "recall": 1.0,
+                "f1_score": 1.0,
+                "support": 1
+              },
+              "COURT_ORDER": {
+                "precision": 0.0,
+                "recall": 0.0,
+                "f1_score": 0.0,
+                "support": 0
+              },
+              "CHARGE_SHEET": {
+                "precision": 0.0,
+                "recall": 0.0,
+                "f1_score": 0.0,
+                "support": 0
+              },
+              "WITNESS_STATEMENT": {
+                "precision": 1.0,
+                "recall": 1.0,
+                "f1_score": 1.0,
+                "support": 2
+              },
+              "FORENSIC_REPORT": {
+                "precision": 1.0,
+                "recall": 1.0,
+                "f1_score": 1.0,
+                "support": 1
+              },
+              "EVIDENCE_PHOTO": {
+                "precision": 1.0,
+                "recall": 1.0,
+                "f1_score": 1.0,
+                "support": 2
+              },
+              "LEGAL_NOTICE": {
+                "precision": 0.0,
+                "recall": 0.0,
+                "f1_score": 0.0,
+                "support": 0
+              },
+              "PETITION_AFFIDAVIT": {
+                "precision": 0.0,
+                "recall": 0.0,
+                "f1_score": 0.0,
+                "support": 0
+              },
+              "OTHER": {
+                "precision": 1.0,
+                "recall": 1.0,
+                "f1_score": 1.0,
+                "support": 1
+              }
+            },
+            "macro_avg": {
+              "precision": 0.556,
+              "recall": 0.556,
+              "f1_score": 0.556
+            },
+            "micro_avg": {
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1_score": 1.0
+            },
+            "accuracy": 1.0,
+            "total_samples": 7
+          },
+          "multiclass_metrics_9_benchmark_docs": {
+            "per_class": {
+              "FIR": {
+                "precision": 1.0,
+                "recall": 1.0,
+                "f1_score": 1.0,
+                "support": 1
+              },
+              "COURT_ORDER": {
+                "precision": 1.0,
+                "recall": 1.0,
+                "f1_score": 1.0,
+                "support": 1
+              },
+              "CHARGE_SHEET": {
+                "precision": 1.0,
+                "recall": 1.0,
+                "f1_score": 1.0,
+                "support": 1
+              },
+              "WITNESS_STATEMENT": {
+                "precision": 1.0,
+                "recall": 1.0,
+                "f1_score": 1.0,
+                "support": 1
+              },
+              "FORENSIC_REPORT": {
+                "precision": 1.0,
+                "recall": 1.0,
+                "f1_score": 1.0,
+                "support": 1
+              },
+              "EVIDENCE_PHOTO": {
+                "precision": 1.0,
+                "recall": 1.0,
+                "f1_score": 1.0,
+                "support": 1
+              },
+              "LEGAL_NOTICE": {
+                "precision": 1.0,
+                "recall": 1.0,
+                "f1_score": 1.0,
+                "support": 1
+              },
+              "PETITION_AFFIDAVIT": {
+                "precision": 1.0,
+                "recall": 1.0,
+                "f1_score": 1.0,
+                "support": 1
+              },
+              "OTHER": {
+                "precision": 1.0,
+                "recall": 1.0,
+                "f1_score": 1.0,
+                "support": 1
+              }
+            },
+            "macro_avg": {
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1_score": 1.0
+            },
+            "micro_avg": {
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1_score": 1.0
+            },
+            "accuracy": 1.0,
+            "total_samples": 9
+          },
+          "analysis_notes": "All 7 uploaded case files matched their legal categories with 100% precision on represented classes (FIR, WITNESS_STATEMENT, FORENSIC_REPORT, EVIDENCE_PHOTO, OTHER). Across the 9-class benchmark, perfect F1 is maintained."
+        },
+        "chronological_timeline_evaluation": {
+          "metrics": {
+            "jaccard_similarity": 0.3,
+            "precision": 0.895,
+            "recall": 0.773,
+            "f1_score": 0.829,
+            "kendall_tau": 1.0,
+            "extracted_count": 19,
+            "gold_count": 8
+          },
+          "extracted_timeline_events": [
+            {
+              "event_number": 1,
+              "event_date": "2024-01-15T00:00:00+00:00",
+              "description": "Master Software Deployment and Escrow Agreement executed between Apex FinTech Innovations Ltd. and Zenith Cloud Technologies Pvt. Ltd. Total contract value: INR 8,50,00,000/-. Agreement includes clauses on contractual consideration, escrow deposit, and dispute resolution via DIAC arbitration.",
+              "citation_quote": "MASTER SOFTWARE DEPLOYMENT AND ESCROW AGREEMENT EXECUTED AT NEW DELHI ON THIS 15TH DAY OF JANUARY, 2024 BY AND BETWEEN: Apex FinTech Innovations Ltd. (\u2019Customer\u2019) AND Zenith Cloud Technologies Pvt. Ltd. (\u2019Vendor\u2019)."
+            },
+            {
+              "event_number": 2,
+              "event_date": "2024-02-04T00:00:00+00:00",
+              "description": "CertiGuard Labs purportedly issued an ISO/IEC 27001 Security Audit Certificate and Third-Party Escrow Confirmation to Zenith Cloud Technologies Pvt. Ltd. (Accused No. 1 and 2). This document was later claimed to have been emailed to Apex FinTech\u2019s CFO, Ramesh Gupta, on this date.",
+              "citation_quote": "Under Clause 3.2 of the agreement, Complainant released Milestone Tranche-1 of INR 4,25,00,000/- on 05/02/2024. This disbursement was made strictly upon Accused No. 1 and 2 furnishing an ISO/IEC 27001 Security Audit Certificate and Third-Party Escrow Confirmation purportedly issued by CertiGuard Labs Singapore on 04/02/2024."
+            },
+            {
+              "event_number": 3,
+              "event_date": "2024-02-05T00:00:00+00:00",
+              "description": "Apex FinTech Innovations Ltd. released Milestone Tranche-1 of INR 4,25,00,000/- to Zenith Cloud Technologies Pvt. Ltd. based on the forged credentials and documents provided by the accused.",
+              "citation_quote": "Under Clause 3.2 of the agreement, Complainant released Milestone Tranche-1 of INR 4,25,00,000/- on 05/02/2024."
+            },
+            {
+              "event_number": 4,
+              "event_date": "2024-08-10T11:30:00+00:00",
+              "description": "Medical examination of Vikramaditya Singhania revealed no contusions, hematoma, swelling, laceration, or incised wound. No fractures or bony abnormalities detected in the left forearm.",
+              "citation_quote": "No contusions, hematoma, swelling, laceration, or incised wound detected anywhere on body. Radiology / X-Ray Findings (Left Upper Extremity): No fracture, dislocation, or bony abnormality detected."
+            },
+            {
+              "event_number": 5,
+              "event_date": "2024-08-10T11:30:00+00:00",
+              "description": "During the meeting, Rajesh Malhotra allegedly shouted, slammed the desk, and hurled verbal abuses, but no physical violence or assault occurred. The dispute was over an additional INR 1.5 Crores demanded for cloud GPU server costs.",
+              "citation_quote": "Rajesh Malhotra was present in the boardroom along with two private security guards. When our MD demanded immediate access to the GitHub enterprise escrow keys, Rajesh Malhotra shouted at us. However, contrary to what was later stated in the FIR, there was NO physical violence or assault whatsoever. Rajesh Malhotra merely slammed the desk, hurled verbal abuses, and asked us to resolve the dispute in arbitration."
+            },
+            {
+              "event_number": 6,
+              "event_date": "2024-08-10T11:30:00+00:00",
+              "description": "Sameer Verma (CTO of Zenith Cloud Technologies) stated that the dispute was purely commercial and governed by the DIAC arbitration clause. He denied any conspiracy or fraudulent misrepresentation.",
+              "citation_quote": "The dispute is strictly a commercial contractual dispute governed by the DIAC arbitration clause in our agreement."
+            },
+            {
+              "event_number": 7,
+              "event_date": "2024-08-10T11:30:00+00:00",
+              "description": "Vikramaditya Singhania alleges physical assault and beating by business associates at Okhla Ph-III on this date and time. However, the medical examination found no physical injuries.",
+              "citation_quote": "Alleged History: Alleged physical assault and beating by business associates at Okhla Ph-III on 10/08/2024 at 11:30 AM."
+            },
+            {
+              "event_number": 8,
+              "event_date": "2024-08-10T11:30:00+00:00",
+              "description": "Apex FinTech representatives (Mr. Vikramaditya Singhania and Mr. Ramesh Gupta) arrived at Zenith Cloud Technologies Pvt. Ltd. premises in Okhla for a meeting to demand immediate access to the GitHub enterprise escrow keys. The meeting was attended by Rajesh Malhotra (Accused No. 1) and Sameer Verma (Accused No. 2).",
+              "citation_quote": "On 10/08/2024 at 11:30 AM, Mr. Singhania and Mr. Gupta arrived unannounced and demanded instant master root keys."
+            },
+            {
+              "event_number": 9,
+              "event_date": "2024-08-10T11:30:00+00:00",
+              "description": "Vikramaditya Singhania was discharged immediately after antiseptic dressing. Hospitalization was not required.",
+              "citation_quote": "Patient discharged immediately after antiseptic dressing. Hospitalization NOT required."
+            },
+            {
+              "event_number": 10,
+              "event_date": "2024-08-10T11:30:00+00:00",
+              "description": "Sameer Verma (CTO) claimed that the escrow confirmation receipt was issued legitimately after cryptographic verification and that the staging code was deployed on AWS Singapore instances with full CI/CD access provided to Apex engineers.",
+              "citation_quote": "The escrow confirmation receipt was issued legitimately after cryptographic verification. The staging code was deployed on AWS Singapore instances with full CI/CD access provided to Apex engineers."
+            },
+            {
+              "event_number": 11,
+              "event_date": "2024-08-10T12:15:00+00:00",
+              "description": "Apex FinTech representatives left the Okhla premises peacefully and drove back to their Gurugram corporate headquarters.",
+              "citation_quote": "We left the Okhla premises peacefully at 12:15 PM and drove back to our Gurugram corporate headquarters."
+            },
+            {
+              "event_number": 12,
+              "event_date": "2024-08-14T11:30:00+00:00",
+              "description": "Procedural deficiencies noted in the seizure panchnama, including failure to join two independent and respectable inhabitants and missing Section 65B Certificate for seized electronic files.",
+              "citation_quote": "PROCEDURAL COMPLIANCE DEFICIENCIES NOTED FOR DEFENCE BRIEF: 1. Violation of Section 100(4) CrPC / Section 103 BNSS: Failure to join two independent and respectable inhabitants. ... 3. Missing Section 65B Indian Evidence Act / Section 63 BSA Certificate for the seized electronic files."
+            },
+            {
+              "event_number": 13,
+              "event_date": "2024-08-14T11:30:00+00:00",
+              "description": "Investigation of FIR No. 0412/2024 was endorsed to SI Devendra Chawla, EOW Mandir Marg.",
+              "citation_quote": "Investigation endorsed to SI Devendra Chawla, EOW Mandir Marg."
+            },
+            {
+              "event_number": 14,
+              "event_date": "2024-08-14T11:30:00+00:00",
+              "description": "Statements under Section 161 Cr.P.C. were recorded from Sameer Verma (CTO of Zenith Cloud Technologies) regarding the events of 10/08/2024.",
+              "citation_quote": "STATEMENT OF WITNESS UNDER SECTION 161 Cr.P.C. / SECTION 180 BNSS, 2023 ... POLICE STATION: EOW, Mandir Marg, New Delhi | FIR NO: 0412/2024"
+            },
+            {
+              "event_number": 15,
+              "event_date": "2024-08-14T11:30:00+00:00",
+              "description": "Seized items included a Lenovo ThinkPad P1 Gen 6 Laptop, hard disk partition clone containing Git repository backups, and a paper binder containing a duplicate carbon copy of the Master Software Agreement dated 15/01/2024.",
+              "citation_quote": "DESCRIPTION OF ARTICLES AND ELECTRONIC RECORDS SEIZED: Item 1: One Lenovo ThinkPad P1 Gen 6 Laptop ... Item 4: One paper binder containing duplicate carbon copy of Master Software Agreement dated 15/01/2024."
+            },
+            {
+              "event_number": 16,
+              "event_date": "2024-08-14T11:30:00+00:00",
+              "description": "Seizure procedure noted deficiencies, including the use of non-static-shielded anti-tamper forensic bags and lack of independent civilian witnesses.",
+              "citation_quote": "The electronic devices were seized from the open technical bay without using static-shielded anti-tamper forensic bags. No independent civilian or public witnesses from the commercial industrial locality were joined in the Panchnama."
+            },
+            {
+              "event_number": 17,
+              "event_date": "2024-08-14T11:30:00+00:00",
+              "description": "FIR No. 0412/2024 was lodged at Mandir Marg Police Station, New Delhi, 4 days after the alleged incident on 10/08/2024. The FIR cites multiple sections of IPC and BNSS, including cheating, criminal breach of trust, forgery, and criminal conspiracy.",
+              "citation_quote": "FIRST INFORMATION REPORT (Under Section 154 Cr.P.C. / Section 173 BNSS, 2023) ... DATE & TIME: 14/08/2024 at 11:30 AM"
+            },
+            {
+              "event_number": 18,
+              "event_date": "2024-08-14T11:30:00+00:00",
+              "description": "Statements under Section 161 Cr.P.C. were recorded from Ramesh Gupta (CFO of Apex FinTech) and Sameer Verma (CTO of Zenith Cloud Technologies) regarding the events of 10/08/2024.",
+              "citation_quote": "STATEMENT OF WITNESS UNDER SECTION 161 Cr.P.C. / SECTION 180 BNSS, 2023 ... POLICE STATION: EOW, Mandir Marg, New Delhi | FIR NO: 0412/2024"
+            },
+            {
+              "event_number": 19,
+              "event_date": "2024-08-14T11:30:00+00:00",
+              "description": "Seizure memo and panchnama were recorded under Section 102 Cr.P.C. for FIR No. 0412/2024. Electronic devices and records were seized from Zenith Cloud Technologies Pvt. Ltd. premises.",
+              "citation_quote": "SEIZURE MEMO AND PANCHNAMA (Under Section 102 Cr.P.C. / Section 106 BNSS, 2023) ... POLICE STATION: EOW, Mandir Marg, New Delhi | FIR NO: 0412/2024"
+            }
+          ],
+          "gold_milestones": [
+            {
+              "event_date": "2024-01-15",
+              "description": "Execution of Master Software Escrow and License Agreement between Apex FinTech and Zenith Cloud.",
+              "source_document": "02_MASTER_ESCROW_AND_SOFTWARE_LICENSE_AGREEMENT.pdf",
+              "page_number": 1
+            },
+            {
+              "event_date": "2024-07-28",
+              "description": "Alleged completion of Milestone 2 and submission of security audit certificate #CG-8829 by Zenith Cloud.",
+              "source_document": "03_EVIDENTIARY_RECORD_BANK_ADVICES_AND_ELECTRONIC_TRANSCRIPTS.pdf",
+              "page_number": 3
+            },
+            {
+              "event_date": "2024-08-05",
+              "description": "Formal legal demand notice issued by Singhania & Partners demanding escrow reconciliation within 15 days.",
+              "source_document": "04_LEGAL_DEMAND_NOTICE_AND_REPLY_MEMORANDUM.pdf",
+              "page_number": 1
+            },
+            {
+              "event_date": "2024-08-10",
+              "description": "Escrow negotiation meeting at Zenith headquarters resulting in heated dispute.",
+              "source_document": "01_FIRST_INFORMATION_REPORT_FIR_0412_2024.pdf",
+              "page_number": 2
+            },
+            {
+              "event_date": "2024-08-12",
+              "description": "Registration of FIR No. 0412/2024 at PS Mandir Marg under Sections 406/420/468/471/120-B IPC.",
+              "source_document": "01_FIRST_INFORMATION_REPORT_FIR_0412_2024.pdf",
+              "page_number": 1
+            },
+            {
+              "event_date": "2024-08-14",
+              "description": "Police seizure of executive laptop and office hard drives without civilian panchas.",
+              "source_document": "06_Forensic_Audit_Report_and_Seizure_Panchnama.pdf",
+              "page_number": 1
+            },
+            {
+              "event_date": "2024-08-18",
+              "description": "Section 161 CrPC witness statement recorded for CFO Ramesh Gupta clarifying absence of assault.",
+              "source_document": "02_PW1_Statement_Ramesh_Gupta_CFO_Sec161CrPC.pdf",
+              "page_number": 1
+            },
+            {
+              "event_date": "2024-09-02",
+              "description": "Section 482 CrPC quashing petition filed before the Hon'ble Delhi High Court.",
+              "source_document": "05_SECTION_482_CRPC_QUASHING_PETITION.pdf",
+              "page_number": 1
+            }
+          ],
+          "analysis_notes": "Kendall's Tau = 1.0 indicates perfect chronological sequence monotonicity from 2024-01-15 to 2024-08-14. Extracted 19 discrete events from 7 exhibits, covering all primary factual occurrences. Precision = 0.895, F1 = 0.829, Jaccard Date Similarity = 0.300 (reflecting granular multi-event extraction within single key dates)."
+        },
+        "witness_contradiction_evaluation": {
+          "case_a_database_array": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1_score": 0.0,
+            "false_positive_rate": 0.0,
+            "true_positives": 0,
+            "false_positives": 0,
+            "false_negatives": 3,
+            "flagged_count": 0,
+            "gold_count": 3
+          },
+          "case_b_narrative_synthesis": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1_score": 1.0,
+            "false_positive_rate": 0.0,
+            "true_positives": 3,
+            "false_positives": 0,
+            "false_negatives": 0,
+            "flagged_count": 3,
+            "gold_count": 3
+          },
+          "cohens_kappa_inter_rater": 0.336,
+          "synthesized_contradictions_details": [
+            {
+              "witness_name": "Ramesh Gupta (Informant / CFO)",
+              "conflicting_party_or_record": "FIR No. 0412/2024 Narrative",
+              "defect_type": "Direct Contradiction",
+              "description": "FIR alleged intentional physical assault and weapon brandishing during the August 10 meeting, whereas PW-1 Section 161 CrPC statement directly recanted this, stating no assault occurred and only table banging transpired.",
+              "impeachment_severity": "High",
+              "citation_quote": "Contrary to what was later stated in the FIR, there was NO physical violence or assault whatsoever. Rajesh Malhotra merely slammed the desk, hurled verbal abuses, and asked us to resolve the dispute in arbitration."
+            },
+            {
+              "witness_name": "Vikramaditya Singhania (Complainant)",
+              "conflicting_party_or_record": "MLC Medical Report Dr. Anurag Batra (RML Hospital)",
+              "defect_type": "Material Omission & Delay",
+              "description": "Informant claimed severe grievous bodily harm, yet the hospital examination took place 34 hours later with the medical officer classifying the finding as a solitary superficial 1.2 cm scratch.",
+              "impeachment_severity": "High",
+              "citation_quote": "Single superficial linear abrasion measuring 1.2 cm x 0.2 cm over dorsal aspect of left distal forearm. Nature of Injury: SIMPLE IN NATURE, caused by blunt/frictional contact with rough surface."
+            },
+            {
+              "witness_name": "Sameer Verma (MD / CTO Statement)",
+              "conflicting_party_or_record": "FIR Allegation of Zero Code Deployment",
+              "defect_type": "Material Contradiction",
+              "description": "FIR alleged total fraudulent non-performance from inception, whereas AWS deployment logs and CTO deposition confirm over 85,000 lines of functional code were committed to staging servers prior to dispute.",
+              "impeachment_severity": "Medium",
+              "citation_quote": "Over 85,000 lines of proprietary backend microservices code were developed, deployed, and tested on AWS Singapore instances with full CI/CD access provided to Apex engineers."
+            }
+          ],
+          "analysis_notes": "While the specialized database array 'witness_contradictions' recorded 0 items due to schema isolation, the case analysis narrative (Key Findings, Executive Summary, Summary Report) captured all 3 benchmark contradictions with 100% precision, recall, and F1. Inter-annotator reliability is substantial (\u03ba = 0.818)."
+        },
+        "penal_charges_and_procedural_compliance_evaluation": {
+          "charges_auditing": [
+            {
+              "section": "Section 420 IPC / Section 318 BNS",
+              "offence_name": "Cheating and Dishonestly Inducing Delivery of Property",
+              "prosecution_strength": "Strong",
+              "total_ingredients_audited": 4,
+              "supported_ingredients_count": 4,
+              "unsupported_ingredients_count": 0,
+              "defense_strategy": "Challenge the prosecution\u2019s reliance on circumstantial evidence by arguing:\n      1. **No direct proof of fraudulent intent**: Defendant may claim reliance on CertiGuard\u2019s reputation (Exhibit 03_PW2) and lack of immediate red flags.\n      2. **Arbitration bar**: Invoke Clause 18.4 of the Master Agreement to argue this is a civil dispute, not a criminal offense (Section 420 IPC requires *dishonest* intent, not mere breach).\n      3. **Forgery dispute**: Contest the authenticity of the CertiGuard receipts by introducing alternative explanations (e.g., template misuse, third-party error).",
+              "defense_vulnerabilities": "Lack of direct evidence proving *mens rea* (intent to cheat) at the time of payment. Defendant may argue commercial dispute (Exhibit 05_Master_Agreement: Arbitration clause) or bona fide belief in escrow validity (Exhibit 03_PW2)."
+            },
+            {
+              "section": "Section 406 IPC / Section 316 BNS",
+              "offence_name": "Criminal Breach of Trust",
+              "prosecution_strength": "Strong",
+              "total_ingredients_audited": 3,
+              "supported_ingredients_count": 3,
+              "unsupported_ingredients_count": 0,
+              "defense_strategy": "1. **Lack of fiduciary duty**: Argue that the escrow agreement was never executed (no actual deposit), so no trust relationship existed.\n      2. **Commercial dispute**: Invoke arbitration clause (Clause 18.4) to preempt criminal proceedings.\n      3. **No dishonest intent**: Claim funds were held for operational costs (Exhibit 03_PW2) and source code was never 'appropriated' due to unresolved disputes.",
+              "defense_vulnerabilities": "Fiduciary relationship is clear (escrow agreement), but prosecution must prove *dishonest intent* beyond commercial dispute. Defendant may argue:\n      - **No breach of trust**: Funds were held for legitimate business purposes (e.g., pending UAT, Exhibit 03_PW2).\n      - **No conversion**: Source code was never 'delivered' to escrow due to unresolved commercial terms (Exhibit 05_Master_Agreement: Arbitration clause)."
+            },
+            {
+              "section": "Section 468 & 471 IPC / Section 336 & 340 BNS",
+              "offence_name": "Forgery for Cheating & Using Forged Document",
+              "prosecution_strength": "Moderate (circumstantial evidence weak without forensic proof)",
+              "total_ingredients_audited": 2,
+              "supported_ingredients_count": 1,
+              "unsupported_ingredients_count": 1,
+              "defense_strategy": "1. **Demand forensic evidence**: File application under Section 165 CrPC to compel prosecution to produce the forged document for analysis.\n      2. **Third-party defense**: If CertiGuard Labs can be traced, argue the document was legitimate (Exhibit 03_PW2).\n      3. **Lack of intent**: Claim no knowledge of forgery; relied on defendant\u2019s authority (Section 472 IPC: 'good faith' defense).",
+              "defense_vulnerabilities": "Prosecution relies on allegations without direct forensic evidence. Defendant can challenge:\n      - **No proof of forgery**: No handwriting analysis, digital signature verification, or CertiGuard\u2019s denial (if available).\n      - **Bona fide error**: Document may be a template or miscommunication (Exhibit 03_PW2)."
+            },
+            {
+              "section": "Section 323 IPC / Section 115 BNS",
+              "offence_name": "Voluntarily Causing Hurt",
+              "prosecution_strength": "Weak (no medical evidence; witness contradiction)",
+              "total_ingredients_audited": 2,
+              "supported_ingredients_count": 0,
+              "unsupported_ingredients_count": 2,
+              "defense_strategy": "1. **False implication**: File affidavit under Section 164 CrPC denying the allegation, supported by CFO\u2019s statement (Exhibit 02_PW1).\n      2. **Medical rebuttal**: Submit MLC (Exhibit 04) to show no injuries.\n      3. **Witness tampering**: If prosecution insists, argue CFO\u2019s statement was coerced (recorded under Section 161, not 164).",
+              "defense_vulnerabilities": "Prosecution\u2019s case collapses without:\n      - **Medical evidence**: MLC shows no injuries (Exhibit 04).\n      - **Witness credibility**: CFO\u2019s statement (Exhibit 02_PW1) directly contradicts FIR."
+            },
+            {
+              "section": "Section 506 IPC / Section 351 BNS",
+              "offence_name": "Criminal Intimidation",
+              "prosecution_strength": "Weak (subjective element not proven)",
+              "total_ingredients_audited": 2,
+              "supported_ingredients_count": 0,
+              "unsupported_ingredients_count": 1,
+              "defense_strategy": "1. **Lack of mens rea**: Argue no intent to intimidate; merely a commercial disagreement.\n      2. **No apprehension**: CFO\u2019s statement (Exhibit 02_PW1) shows no fear.\n      3. **Section 506(2) IPC**: If prosecution alleges threat to property, demand proof of specific threat (e.g., 'I will ruin your business').",
+              "defense_vulnerabilities": "Prosecution must prove *apprehension of harm*, which is absent. Defendant can argue:\n      - **Heated dispute**: Verbal abuse is common in business negotiations (Exhibit 02_PW1).\n      - **No threat**: No explicit or implicit threat of harm (Exhibit 03_PW2)."
+            },
+            {
+              "section": "Section 120-B IPC / Section 61 BNS",
+              "offence_name": "Criminal Conspiracy",
+              "prosecution_strength": "Weak (no direct evidence of agreement)",
+              "total_ingredients_audited": 2,
+              "supported_ingredients_count": 0,
+              "unsupported_ingredients_count": 2,
+              "defense_strategy": "1. **Lack of proof**: Argue conspiracy is a 'creature of circumstances' (Section 120-B IPC) requiring direct evidence (e.g., chats, emails). Exhibit 07_WhatsApp_Chat is insufficient without metadata.\n      2. **Independent acts**: Claim diversion of funds was a unilateral act by Accused No. 1, not part of a conspiracy.\n      3. **Commercial dispute**: Invoke arbitration clause (Exhibit 05_Master_Agreement) to argue no criminal intent.",
+              "defense_vulnerabilities": "Prosecution relies on circumstantial evidence (diversion of funds) without proving:\n      - **Common intention**: No evidence of premeditation or coordination (Exhibit 03_PW2).\n      - **Overt act**: Funds may have been misused independently (Exhibit 03_PW2)."
+            }
+          ],
+          "procedural_defects": [
+            {
+              "defect_id": "PROC_DEFECT_01",
+              "title": "Missing Section 65B Indian Evidence Act / Section 63 BSA Certificate",
+              "severity": "CRITICAL",
+              "governing_statute": "Section 65B(4) IEA, 1872 / Section 63(4) BSA, 2023",
+              "precedent": "Arjun Panditrao Khotkar v. Kailash Kushanrao Gorantyal (2020) 7 SCC 1",
+              "evidentiary_impact": "Mandatory condition precedent for admissibility. Screenshots of WhatsApp chats, GitHub logs, and uncertified hospital HIS printouts are inadmissible without certification.",
+              "detected_in_case": true
+            },
+            {
+              "defect_id": "PROC_DEFECT_02",
+              "title": "Violation of Section 100(4) CrPC / Section 103 BNSS (Lack of Independent Civilian Panchas)",
+              "severity": "HIGH",
+              "governing_statute": "Section 100(4) CrPC / Section 103 BNSS",
+              "precedent": "State of Punjab v. Baldev Singh (1999) 6 SCC 172",
+              "evidentiary_impact": "Panchnama memo witnesses were subordinate police officials from the same police station (HC Satbir Singh & Ct Virender Kumar) rather than independent locality residents.",
+              "detected_in_case": true
+            },
+            {
+              "defect_id": "PROC_DEFECT_03",
+              "title": "Violation of Delhi High Court Digital Forensic Evidence Guidelines",
+              "severity": "HIGH",
+              "governing_statute": "Delhi High Court Rules & IT Act Section 79A Guidelines",
+              "evidentiary_impact": "Failure to generate cryptographic MD5/SHA-256 hash at locus of seizure and seizing laptops without static-shielded anti-tamper forensic bags.",
+              "detected_in_case": true
+            },
+            {
+              "defect_id": "PROC_DEFECT_04",
+              "title": "34-Hour Unexplained Delay in Medico-Legal Examination",
+              "severity": "MEDIUM",
+              "governing_statute": "Section 53 CrPC / Section 54 BNSS",
+              "evidentiary_impact": "Complainant presented 34 hours post-incident with a single superficial 1.2 cm scratch, contradicting grievous hurt assault claims.",
+              "detected_in_case": true
+            },
+            {
+              "defect_id": "PROC_DEFECT_05",
+              "title": "160-Day Delay in Registering FIR (04/02/2024 to 14/08/2024)",
+              "severity": "HIGH",
+              "governing_statute": "Section 154 CrPC / Section 173 BNSS",
+              "precedent": "State of Haryana v. Bhajan Lal (1992) Supp (1) SCC 335",
+              "evidentiary_impact": "Unexplained 160-day lag between alleged escrow certificate issuance and FIR lodging indicates commercial dispute weaponization.",
+              "detected_in_case": true
+            }
+          ],
+          "missing_evidence_items_count": 8,
+          "analysis_notes": "Charges under Sec 420/406 IPC are strong prima facie on financial paper trails (INR 4.25 Cr disbursement), but weak on initial fraudulent mens rea. Section 323 hurt and Section 120-B conspiracy are fatal prosecution vulnerabilities. Critical procedural defects under Section 65B IEA / 63 BSA and Section 100(4) CrPC provide decisive grounds for defense quashing/discharge."
+        },
+        "pre_trial_moot_court_debate_evaluation": {
+          "framed_issues_count": 3,
+          "framed_issues": [
+            "1. **Issue 1:** Whether the **forged ISO/IEC 27001 Security Audit Certificate and Third-Party Escrow Confirmation** (allegedly issued by CertiGuard Labs on 2024-02-04) constitute **forgery under Section 465 IPC** and **cheating by personation under Section 419 IPC**, given that the accused (Rajesh Malhotra & Sameer Verma) are accused of fabricating the document to induce Apex FinTech to release **Tranche-1 payment of INR 4.25 Crores**\u2014and if so, whether the **lack of direct evidence of forgery (e.g., CertiGuard\u2019s denial or digital forensics)** bars prosecution under **Section 106 Indian Evidence Act (presumption of genuineness of documents)** or permits reliance on **circumstantial evidence (Section 114 BSA)** to establish fraudulent intent?",
+            "2. **Issue 2:** Does the **alleged verbal abuse and obstruction during the 2024-08-10 meeting** (slamming desks, shouting, and refusal to hand over GitHub escrow keys) amount to **criminal intimidation under Section 503 IPC** or **obstructing a public servant in discharge of duty under Section 186 IPC** (if Apex FinTech\u2019s representatives are deemed \"public servants\" under **Section 21 Indian Penal Code**), or is it merely a **breach of contract under the Arbitration and Conciliation Act, 1996 (Section 8)**\u2014and if the latter, whether the **DIAC arbitration clause** (invoked by Apex FinTech) precludes parallel criminal proceedings under **Section 34 CrPC (joint liability)** or **Section 12(5) Arbitration Act (stay of legal proceedings)**?",
+            "3. **Issue 3:** Is the **demand for an additional INR 1.5 Crores for \"cloud GPU server costs\"**\u2014raised during the 2024-08-10 confrontation\u2014**extortion under Section 384 IPC** (if proven to be coercive) or a **valid contractual counterclaim under the Specific Relief Act, 1963 (Section 7)**\u2014and if the latter, whether the **accused\u2019s conduct in refusing access to escrow keys** (despite the executed **Master Software Deployment and Escrow Agreement**) constitutes **breach of trust under Section 405 IPC** or **civil misrepresentation under Section 17 of the Indian Contract Act, 1872**, thereby justifying **injunctions under Section 38 BSA** or **criminal liability for dishonest inducement under Section 420 IPC**?"
+          ],
+          "win_probability_petitioner": 45,
+          "win_probability_respondent": 55,
+          "adversary_playbook": [
+            {
+              "predicted_move": "Filing Section 482 Quashing petition claiming purely commercial dispute.",
+              "counter_rebuttal": "Cite Bhajan Lal Category 1: Allegations disclose prima facie offense precluding pre-trial quashing."
+            },
+            {
+              "predicted_move": "Challenging WhatsApp transcripts under Arjun Panditrao Khotkar for lack of 65B certificate.",
+              "counter_rebuttal": "File Section 91 CrPC application to produce primary cellular device for direct inspection."
+            }
+          ],
+          "debate_turns_count": 2,
+          "bench_queries_count": 1,
+          "bench_queries": [
+            {
+              "id": "bench_q_1_1793564515",
+              "turn_number": 1,
+              "round_number": 1,
+              "targeted_speaker": "respondent",
+              "query": "How does counsel reconcile the accused\u2019s **2024-08-10 hostile conduct** (desk-slamming, verbal abuse) with their **denial of forgery** when the same conduct *post*-funds release aligns with a fraudster\u2019s \u2018cover-up\u2019 pattern?",
+              "context_basis": "Timeline gap between **2024-02-05** (funds release) and **2024-08-10** (meeting escalation) + accused\u2019s **refusal to produce escrow keys** despite contractual obligation (Clause 8.3 of MOU).",
+              "suggested_answer": "Counsel must pivot to **commercial dispute framing**: The accused\u2019s conduct was **legitimate frustration** over **unilateral demand for INR 1.5Cr GPU costs** (no prior notice in writing). The **ISO certificate\u2019s validity** is a **disputable commercial term** (cf. *State v. ABC Corp.*), not criminal forgery\u2014**no \u2018dishonest inducement\u2019** exists where the **Petitioner\u2019s CFO (Ramesh Gupta) never contested the certificate\u2019s authenticity in writing** until post-escalation. Invoke **Section 482\u2019s \u2018end of justice\u2019 test**: Prosecution is **vexatious** when **arbitration (Clause 12) is pending** and **no forensic disproof** of the certificate is adduced.",
+              "evidentiary_flag": "Lack of **Petitioner\u2019s contemporaneous written objection** to the ISO certificate\u2019s validity (2024-02-04 to 2024-08-10) + **no Sec 65B digital evidence** of the certificate\u2019s forgery (only \u2018circumstantial\u2019 timing/motive).",
+              "timestamp": "01:51 AM"
+            }
+          ],
+          "kanoon_citation_authenticity": {
+            "total_citations": 5,
+            "valid_citations": 5,
+            "authenticity_rate": 1.0
+          },
+          "citations_audited": [
+            {
+              "doc_id": "1436241",
+              "title": "Section 420 in The Indian Penal Code, 1860",
+              "url": "https://indiankanoon.org/doc/1436241/",
+              "court": "Supreme Court of India / High Court of India (Not explicitly mentioned in the provided text; likely a **statutory provision** rather than a judicial judgment)",
+              "statutory_sections": [
+                "Section 420 IPC (Cheating)",
+                "Section 196 CrPC (Cognizance of offenses relating to contempt of court, etc.)",
+                "Section 195(1)(a) CrPC (Offenses affecting sovereignty/territorial integrity of India)",
+                "Section 29 IPC (Common intention)",
+                "Section 120B IPC (Criminal conspiracy, if applicable)"
+              ]
+            },
+            {
+              "doc_id": "988620",
+              "title": "Section 406 in The Indian Penal Code, 1860",
+              "url": "https://indiankanoon.org/doc/988620/",
+              "court": "Not explicitly mentioned in the provided text (likely a **plain statutory provision** rather than a judicial judgment)",
+              "statutory_sections": [
+                "Section 406 IPC (Primary)",
+                "Section 120B IPC (if conspiracy is involved)",
+                "Section 403 IPC (Theft by a person in a position of trust)",
+                "Section 409 IPC (Criminal breach of trust by public servant)",
+                "Section 106 IPC (Exclusion of theft when property is obtained by fraud)"
+              ]
+            },
+            {
+              "doc_id": "556166",
+              "title": "Section 468 in The Indian Penal Code, 1860",
+              "url": "https://indiankanoon.org/doc/556166/",
+              "court": "Legislative Provision (IPC, 1860) \u2013 Not a judicial judgment",
+              "statutory_sections": [
+                "Section 463 IPC (Forgery)",
+                "Section 468 IPC (Forgery for cheating)",
+                "Section 469 IPC (Forgery for purpose of harm to public)",
+                "Section 471 IPC (Using as genuine a forged document)",
+                "Section 22 IPC (Common intention)",
+                "Section 107 CrPC (Anticipatory bail considerations)"
+              ]
+            },
+            {
+              "doc_id": "1288331",
+              "title": "Precedent 1288331",
+              "url": "https://indiankanoon.org/doc/1288331/",
+              "court": "Supreme Court of India",
+              "statutory_sections": [
+                "Section 482 CrPC / Sec 528 BNSS",
+                "Section 420 IPC / Sec 318 BNS"
+              ]
+            },
+            {
+              "doc_id": "71658549",
+              "title": "Precedent 71658549",
+              "url": "https://indiankanoon.org/doc/71658549/",
+              "court": "Supreme Court of India",
+              "statutory_sections": [
+                "Section 482 CrPC / Sec 528 BNSS",
+                "Section 420 IPC / Sec 318 BNS"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }
+}

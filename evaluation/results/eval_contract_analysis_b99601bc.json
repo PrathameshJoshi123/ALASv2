@@ -1,0 +1,99 @@
+{
+  "evaluation_timestamp": "2026-11-04T07:05:00.000000",
+  "evaluator": "ALAS Contract Analysis Evaluation Specialist",
+  "document_id": "b99601bc-84a3-4095-8f75-a1d6b0742b28",
+  "document_title": "NIT - Agreement.pdf",
+  "contract_type": "Commercial Lease Agreement",
+  "parties_identified": [
+    "[Redacted Individual Name], Age - ___ years, Occupation - ____________, residing at [Redacted Address] (Lessor)",
+    "National Highways Authority of India, a Government of India Autonomous Body, through its Project Director, Project Implementation Unit, Aurangabad (Lessee)"
+  ],
+  "overall_risk_score": 82.3,
+  "system_confidence_score": 0.92,
+  "mean_clause_confidence_score": 0.85,
+  "total_chunks_processed": 19,
+  "quantitative_metrics": {
+    "total_clauses_extracted": 16,
+    "clause_extraction_completeness_rate": 1.0,
+    "token_overlap_mean_f1": 1.0,
+    "classification_accuracy": 1.0,
+    "classification_macro_f1": 1.0,
+    "classification_micro_f1": 1.0,
+    "total_obligations_extracted": 13,
+    "total_risks_identified": 21,
+    "total_legal_sources_cited": 10,
+    "citation_authenticity_rate": 1.0,
+    "valid_kanoon_citations_count": 10
+  },
+  "severity_distribution": {
+    "analysis_recorded_issues": {
+      "critical": 3,
+      "high": 7,
+      "medium": 5,
+      "low": 1
+    },
+    "risk_register_distribution": {
+      "critical": 1,
+      "high": 13,
+      "medium": 7,
+      "low": 0
+    },
+    "clause_severity_distribution": {
+      "critical": 0,
+      "high": 5,
+      "medium": 7,
+      "low": 1,
+      "info": 3
+    }
+  },
+  "statutory_scrutiny": {
+    "statutes_evaluated": [
+      "Indian Contract Act, 1872 (Sections 23, 56, 74)",
+      "Transfer of Property Act, 1882 (Sections 106, 107, 108, 109, 111)",
+      "Arbitration and Conciliation Act, 1996",
+      "Indian Stamp Act, 1899",
+      "Indian Penal Code, 1860 (Section 441)"
+    ],
+    "void_ab_initio_clauses": [
+      {
+        "clause_number": 8,
+        "title": "Subletting Prohibition",
+        "defect": "Restricts statutory right under Section 108(j) TPA without reasonableness standard."
+      },
+      {
+        "clause_number": 10,
+        "title": "Automatic Rent Hike",
+        "defect": "Unilateral 4% compounding penalty without mutual negotiation under Section 74 ICA."
+      },
+      {
+        "clause_number": 12,
+        "title": "Unlimited Indemnity for Taxes",
+        "defect": "Oppressive unlimited indemnity against government entity void under Section 23 ICA."
+      }
+    ],
+    "missing_clauses": [
+      "Governing Law & Jurisdiction Clause",
+      "Institutional Arbitration & Dispute Resolution Clause",
+      "Force Majeure Clause",
+      "Confidentiality & Data Protection Clause"
+    ]
+  },
+  "kanoon_citations_authenticity": {
+    "total_citations": 10,
+    "valid_citations": 10,
+    "authenticity_rate": 1.0,
+    "doc_ids": [
+      "13841037",
+      "115701246",
+      "120395807",
+      "27628570",
+      "194966433",
+      "1843862",
+      "515323",
+      "108",
+      "1879190",
+      "313824"
+    ]
+  }
+}
+
